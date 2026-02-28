@@ -1,0 +1,16 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Large page renders (kept locally, excluded from git to stay under size limits)
+# Remove entries below if Overleaf needs these files via GitHub sync
+figures/P*_page*_render.png
+
+# OS files
+.DS_Store
+Thumbs.db
