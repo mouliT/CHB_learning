@@ -3,7 +3,7 @@
 %  Paper 3 Reference Notes
 %  Source: [Vasishta et al.], IEEE Access
 %  Figures stored in: figures/
-%  Naming convention: P3_Fig[N]_[description].png
+%  Naming convention: P3_Fig[N]_page[XX].png  (caption-extracted at 200 DPI)
 % ============================================================
 \documentclass[12pt, a4paper]{article}
 
@@ -16,7 +16,7 @@
 
 % ---- figures ----
 \usepackage{graphicx}
-\graphicspath{{figures/}}           % all PNGs live here
+\graphicspath{{figures/}}
 \usepackage{float}
 \usepackage{caption}
 \usepackage{subcaption}
@@ -93,31 +93,25 @@
     breakable, enhanced, left=4pt, right=4pt, top=4pt, bottom=4pt}
 
 % ---- custom commands ----
-% Grid quantities
-\newcommand{\vg}{v_{g}}                    % grid voltage (instantaneous)
-\newcommand{\Vg}{V_{g}}                    % grid voltage (amplitude)
-\newcommand{\ig}{i_{g}}                    % grid current (instantaneous)
-\newcommand{\Ig}{I_{g}}                    % grid current (amplitude)
-\newcommand{\omg}{\omega}                  % fundamental angular frequency
-\newcommand{\phig}{\phi_{g}}               % power factor angle (grid)
-% DC-link quantities
-\newcommand{\Vdc}{V_{dc}}                  % nominal DC-link voltage (per cell)
-\newcommand{\Vdci}[1]{V_{dc,#1}}          % DC-link voltage of cell i
-\newcommand{\Vtot}{V_{dc,\mathrm{tot}}}    % total DC-link voltage (sum over all cells)
-% Modulation
-\newcommand{\Mi}{M_{i}}                    % modulation index of cell i
-\newcommand{\phic}{\varphi}               % clamping angle
-\newcommand{\vref}{v_{\mathrm{ref}}}       % modulation reference signal
-% Loading power
-\newcommand{\PH}{P_{H}}                    % loading power (generic)
-\newcommand{\PHi}[1]{P_{H,#1}}            % loading power of cell i
-\newcommand{\PHnc}{P_{H}^{\mathrm{nc}}}   % loading power, non-clamped mode
-\newcommand{\PHcl}{P_{H}^{\mathrm{cl}}}   % loading power, clamped mode
-% Miscellaneous
+\newcommand{\vg}{v_{g}}
+\newcommand{\Vg}{V_{g}}
+\newcommand{\ig}{i_{g}}
+\newcommand{\Ig}{I_{g}}
+\newcommand{\omg}{\omega}
+\newcommand{\phig}{\phi_{g}}
+\newcommand{\Vdc}{V_{dc}}
+\newcommand{\Vdci}[1]{V_{dc,#1}}
+\newcommand{\Vtot}{V_{dc,\mathrm{tot}}}
+\newcommand{\Mi}{M_{i}}
+\newcommand{\phic}{\varphi}
+\newcommand{\vref}{v_{\mathrm{ref}}}
+\newcommand{\PH}{P_{H}}
+\newcommand{\PHi}[1]{P_{H,#1}}
+\newcommand{\PHnc}{P_{H}^{\mathrm{nc}}}
+\newcommand{\PHcl}{P_{H}^{\mathrm{cl}}}
 \newcommand{\figref}[1]{Figure~\ref{#1}}
 
 % ---- figure entry macro ----
-% Usage: \figentry{label}{filename}{caption}{width}
 \newcommand{\figentry}[4]{%
     \begin{figure}[H]
         \centering
@@ -148,26 +142,15 @@
 Each section follows this standard structure:
 
 \begin{enumerate}
-    \item \textbf{Figure} --- the relevant figure from the paper
+    \item \textbf{Figure} --- extracted directly from the paper (cropped by caption detection)
     \item \textbf{Circuit Description} (blue box) --- what components are present
-          and how they are connected; what the topology is doing
-    \item \textbf{State Variables \& Parameters} (orange box) --- every symbol
-          that appears in the figure, with units and physical meaning
-    \item \textbf{Governing Equations} (green box) --- the equations that
-          describe this element of the system, derived from first principles
-    \item \textbf{Physical Interpretation} (gray box) --- what the result
-          \emph{means}: energy flow, design trade-offs, why this matters
+          and how they connect
+    \item \textbf{State Variables \& Parameters} (orange box) --- every symbol,
+          with units and physical meaning
+    \item \textbf{Governing Equations} (green box) --- equations derived from first principles
+    \item \textbf{Physical Interpretation} (gray box) --- what the result means:
+          energy flow, design trade-offs, why it matters
 \end{enumerate}
-
-All figures are from the source paper on DC-link voltage balancing modulation
-for Cascaded H-Bridge converters.
-
-\medskip
-\textbf{Vector figures (Figs.\,1--7)} are circuit diagrams and block diagrams
-drawn as PDF vector graphics. They are shown here as full-page renders
-(\texttt{P3\_pageXX\_render.png}). Crop the relevant figure from the render
-and rename following the \texttt{P3\_Fig[N]\_description.png} convention before
-final use.
 
 \clearpage
 
@@ -192,66 +175,32 @@ the total AC output is:
 \[
     \vg = \sum_{i=1}^{n} v_{i}(t)
 \]
-where $v_i(t)$ is the output voltage of cell $i$.
 
-\medskip
-\textbf{Why use CHB?} High AC voltage (e.g., medium voltage grid) from
-low-voltage DC sources (e.g., 200\,V solar panels) without a transformer.
-Each cell contributes a small voltage step. The staircase sum approaches a
-sinusoidal waveform with low harmonic distortion.
+\textbf{Why use CHB?} High AC voltage from low-voltage DC sources without a
+transformer. Each cell contributes a small voltage step; their staircase sum
+approximates a sinusoid with low harmonic distortion.
 
-\medskip
 \textbf{The problem:} Real DC sources are not identical. Solar panels on
-different roof faces receive different irradiance. Batteries in different
-strings age differently. Each cell's DC source delivers a different power
-$P_{i}$. This is intentional and useful --- but it forces the DC-link
-voltages $\Vdci{i}$ of the cells to diverge over time if nothing is done
-about it.
+different roof faces see different irradiance. Without balancing, the DC-link
+voltages $\Vdci{i}$ diverge over time --- some cells over-charge, others under-charge.
 
-\medskip
-\textbf{Why does diverging $\Vdci{i}$ matter?}
-\begin{itemize}
-    \item The total output voltage can no longer be shared equally: some
-          cells produce more volts per switch state than others. The output
-          waveform becomes distorted.
-    \item Capacitor over-voltage: if $\Vdci{i}$ rises too high, the capacitor
-          or switches are damaged.
-    \item Under-voltage: if $\Vdci{i}$ drops, the cell cannot contribute its
-          share of the AC voltage. Output voltage sags.
-\end{itemize}
-
-The task of \textbf{DC-link voltage balancing} is to keep all $\Vdci{i}$
-equal to a common reference $\Vdc$ despite the cells having different source
-powers.
-
-\figentry{fig:P3Fig1}{P3_page01_render.png}%
-{Full page 1 render. \textbf{Fig.\,1 (CHB topology)} appears in the
-lower-right area of this page. It shows $n$ H-bridge cells in series, each
-with an isolated DC-link capacitor and unequal source powers
-$P_{1H} \neq P_{2H} \neq \cdots \neq P_{nH}$. Crop this render to extract
-Fig.\,1 and rename to \texttt{P3\_Fig1\_CHB\_topology.png}.}{0.6}
+\figentry{fig:P3Fig1}{P3_Fig1_page01.png}%
+{Fig.\,1 --- CHB topology: $n$ H-bridge cells in series, each with its own
+ isolated DC-link capacitor. The source powers $P_{1H},\,P_{2H},\ldots,P_{nH}$
+ are generally unequal. The AC outputs are summed in series and connected
+ to the grid through filter inductance $L_f$.}{0.65}
 
 \begin{circuitbox}[Circuit Description --- CHB Topology (Fig.\,1)]
-The CHB string contains $n$ identical H-bridge cells connected in series at
-their AC output terminals. Inside each cell $i$:
+Each cell $i$ in the CHB string contains:
 \begin{itemize}
-    \item \textbf{DC-link capacitor} $C_{dc,i}$: stores the DC energy.
-          Voltage $\Vdci{i}$ can differ from cell to cell.
-    \item \textbf{H-bridge switches} ($S_{i,1}$--$S_{i,4}$, typically IGBTs):
-          chop the DC voltage into AC via pulse-width modulation.
-    \item \textbf{DC source} (solar panel / battery / diode rectifier):
-          delivers power $P_{iH}$ into the DC-link. The subscript $H$
-          denotes the H-bridge loading power (defined precisely in
-          Section~\ref{sec:loading_power}).
+    \item \textbf{DC-link capacitor} $C_{dc,i}$: stores DC energy at voltage $\Vdci{i}$.
+    \item \textbf{H-bridge switches}: four IGBTs chopping the DC voltage into AC
+          via pulse-width modulation.
+    \item \textbf{DC source}: delivers power $P_{iH}$ into the DC link.
 \end{itemize}
-The AC output of all cells is summed in series. The sum drives the grid
-current $\ig$ through the series-connected filter inductor $L_{f}$.
-
-\medskip
-Key structural point: the cells are \textbf{AC-coupled} (series output) but
-\textbf{DC-isolated} (each has its own capacitor). This means the AC current
-$\ig$ is the same for every cell, but each cell's DC voltage $\Vdci{i}$ is
-independent.
+The AC outputs of all cells connect in series. The common grid current $\ig$
+flows through every cell --- but each cell's DC voltage $\Vdci{i}$ is
+independent. This is the structural source of the balancing challenge.
 \end{circuitbox}
 
 \begin{statebox}
@@ -260,33 +209,23 @@ independent.
 \toprule
 \textbf{Symbol} & \textbf{Quantity} & \textbf{Role / Typical Value} \\
 \midrule
-$n$        & Number of H-bridge cells  & 3 in prototype (230\,V$_{\rm rms}$ grid, 180\,V per cell) \\
-$\Vdci{i}$ & DC-link voltage, cell $i$ & Target: 180\,V each; varies if unbalanced \\
-$\Vtot$    & $\sum_{i=1}^{n}\Vdci{i}$  & Total DC-link sum; controlled by outer loop \\
-$C_{dc,i}$ & DC-link capacitance        & Sets voltage ripple magnitude \\
-$\PHi{i}$  & Loading power, cell $i$    & Net power from DC source into $C_{dc,i}$; positive = charging \\
-$\ig$      & Grid current               & Same through all cells; controlled by inner loop \\
-$L_{f}$    & Filter inductance          & Grid-side series inductor \\
+$n$        & Number of H-bridge cells  & 3 in prototype (230\,V$_{\rm rms}$ grid) \\
+$\Vdci{i}$ & DC-link voltage, cell $i$ & Target: 180\,V each \\
+$\Vtot$    & $\sum_{i=1}^{n}\Vdci{i}$  & Controlled by outer loop \\
+$\PHi{i}$  & Loading power, cell $i$   & Net power from DC source into $C_{dc,i}$ \\
+$\ig$      & Grid current              & Same through all cells \\
+$L_{f}$    & Filter inductance         & Grid-side series inductor \\
 \bottomrule
 \end{tabular}
 \end{statebox}
 
 \begin{physbox}[Physical Interpretation --- Why Voltages Diverge]
-At steady state, each cell's DC-link capacitor voltage is constant, which
-means the power flowing into the capacitor equals the power flowing out.
-The power in comes from the DC source ($P_{i,\mathrm{source}}$). The power
-out is delivered to the AC grid via the H-bridge.
-
-If cell 1's source delivers 500\,W and cell 2's source delivers 200\,W,
-but each cell must deliver the same fraction of the total AC power (because
-the AC current $\ig$ is the same through both), there is a mismatch:
-cell 1 is over-sourced and cell 2 is under-sourced. Without balancing, this
-mismatch charges $C_{dc,1}$ and discharges $C_{dc,2}$ indefinitely.
-
-\medskip
-The balancing controller must redistribute how much AC power each cell
-contributes, so that each cell's capacitor reaches a steady-state equilibrium
-at $\Vdc$.
+At steady state, each cell's capacitor voltage is constant: power in from the
+DC source equals power out to the AC grid. If cell\,1 sources 500\,W and
+cell\,2 sources 200\,W, but both must carry the same AC current $\ig$, there
+is a mismatch. Without correction, cell\,1 over-charges and cell\,2 under-charges
+indefinitely. The balancing controller must redistribute how much AC power each
+cell contributes so that every capacitor reaches equilibrium at $\Vdc$.
 \end{physbox}
 
 \clearpage
@@ -295,60 +234,34 @@ at $\Vdc$.
 \label{sec:control}
 % ============================================================
 
-\figentry{fig:P3Fig2}{P3_page02_render.png}%
-{Full page 2 render. \textbf{Fig.\,2 (Control scheme)} appears on this page.
-It shows the three-loop control: outer $\Vtot$ loop, inner $\ig$ loop, and
-the balancing modulation block. Crop to \texttt{P3\_Fig2\_control\_scheme.png}.}{0.6}
+\figentry{fig:P3Fig2}{P3_Fig2_page02.png}%
+{Fig.\,2 --- Three-loop control architecture: (1) outer $\Vtot$ loop sets
+ grid current reference amplitude; (2) inner $\ig$ loop tracks the reference;
+ (3) balancing loop assigns per-cell modulation strategy (clamped vs.
+ non-clamped) and computes individual modulation indices.}{0.90}
 
-The control has three layers, working from slow (outer) to fast (inner):
+The control has three layers, slow to fast:
 
 \subsection{Outer Loop: Total DC-Link Voltage Control}
-
-\textbf{What it controls:} the sum $\Vtot = \sum_{i=1}^{n} \Vdci{i}$.
-
-\textbf{How:} A PI controller compares $\Vtot$ to the reference $nV_{dc,\mathrm{ref}}$.
-The output is the grid current reference amplitude $\Ig^{*}$. A larger
-$\Ig^{*}$ means more current from the grid, which charges all cells
-simultaneously.
-
-\textbf{Timescale:} slow --- this loop responds to changes in total load
-or total source power. It does not distinguish between cells.
+A PI controller compares $\Vtot = \sum_{i}\Vdci{i}$ to the reference $nV_{dc,\mathrm{ref}}$.
+Output: grid current reference amplitude $\Ig^{*}$. Timescale: slow.
 
 \subsection{Inner Loop: Grid Current Control}
+A fast current controller (PI or PR) generates the total modulation reference
+$\vref(t)$ that is then split among the $n$ cells. Timescale: one to a few
+switching periods.
 
-\textbf{What it controls:} $\ig(t)$, the actual grid current.
-
-\textbf{How:} A fast current controller (PI, PR, or deadbeat) generates a
-total modulation reference $\vref(t)$ that is shared and then split among
-the $n$ cells.
-
-\textbf{Timescale:} fast (typically one or a few switching periods).
-
-\subsection{Balancing Loop: Individual Cell Voltage Control}
-
-\textbf{What it controls:} each $\Vdci{i}$ individually, keeping them equal.
-
-\textbf{How:} this is the key contribution of the paper. The balancing loop
-assigns each cell a modulation \emph{strategy} (clamped or non-clamped) and
-adjusts the individual cell modulation index $\Mi$ and clamping angle $\phic$.
-By doing so, the \textbf{loading power} $\PHi{i}$ of each cell is set to
-exactly the value needed to charge or discharge $C_{dc,i}$ to the target.
-
-\textbf{Timescale:} can be set very fast --- the loading power can be changed
-within one or two fundamental cycles (10--20\,ms at 50\,Hz), giving the
-$\sim$140\,ms settling time demonstrated experimentally.
+\subsection{Balancing Loop: Per-Cell Voltage Control}
+This is the key contribution. The balancing loop assigns each cell a
+modulation strategy (clamped or non-clamped) and computes $\Mi$ and clamping
+angle $\phic$ so that the \textbf{loading power} $\PHi{i}$ of each cell is
+set to exactly the value needed to charge or discharge $C_{dc,i}$ back to $V_{dc,\mathrm{ref}}$.
 
 \begin{physbox}[Why Three Loops?]
-The outer loop sees the total energy. It does not care which cell holds that
-energy --- just that the sum is right. Think of it as controlling the total
-water level in a set of connected tanks.
-
-The balancing loop then redistributes energy between tanks without changing
-the total. The key is that the redistribution is done through the modulation
---- by changing \emph{how each cell switches}, not by adding hardware.
-
-The inner current loop ensures the redistribution does not distort the
-grid current.
+The outer loop controls the total energy across all cells --- it does not
+care which cell holds it. The balancing loop redistributes energy between
+cells through the modulation alone, without adding hardware. The inner current
+loop ensures redistribution does not distort the grid current.
 \end{physbox}
 
 \clearpage
@@ -357,53 +270,28 @@ grid current.
 \label{sec:conventional}
 % ============================================================
 
-\figentry{fig:P3Fig3}{P3_page03_render.png}%
-{Full page 3 render. \textbf{Fig.\,3 (Conventional PI balancing)} appears on
-this page. It shows a PI controller for each cell correcting its modulation
-index based on the voltage error $\Vdci{i} - \Vdc$. Also on this page:
-\textbf{Fig.\,4 (sorting algorithm)} and \textbf{Fig.\,5 (two-cell case)}.
-Crop individually and rename as:
-\texttt{P3\_Fig3\_PI\_balancing.png},
-\texttt{P3\_Fig4\_sorting\_algorithm.png},
-\texttt{P3\_Fig5\_two\_cell\_case.png}.}{0.6}
+\figentry{fig:P3Fig3}{P3_Fig3_page02.png}%
+{Fig.\,3 --- Conventional PI balancing algorithm. Each cell $i$ has its own
+ PI controller that compares $\Vdci{i}$ to the reference and outputs a
+ small modulation correction $\Delta M_i$.}{0.85}
 
-\subsection{How the Conventional Method Works}
-
-Each cell gets a PI controller that watches the voltage error
-$\varepsilon_i = \Vdci{i} - V_{dc,\mathrm{ref}}$.
-
-The PI output is a small modulation correction $\Delta M_i$:
+Each cell gets a PI controller watching the voltage error
+$\varepsilon_i = \Vdci{i} - V_{dc,\mathrm{ref}}$:
 \[
     \Delta M_i = \left(K_P + \frac{K_I}{s}\right) \varepsilon_i
 \]
+This correction $\Delta M_i$ is added to the shared base modulation reference.
+A cell with over-voltage gets a larger modulation index (extracts more power,
+pulls voltage down). A cell with under-voltage gets a smaller modulation index
+(extracts less power, allows charging).
 
-This correction is added to the base modulation reference (which all cells
-share from the inner current loop):
-\[
-    M_i^{\mathrm{total}}(t) = M_{\mathrm{base}}(t) + \Delta M_i
-\]
-
-A cell with $\Vdci{i} > V_{dc,\mathrm{ref}}$ gets a larger modulation index
-(delivers more AC power, consuming more of its stored DC energy, pulling the
-voltage down). A cell with $\Vdci{i} < V_{dc,\mathrm{ref}}$ gets a smaller
-modulation index (delivers less AC power, allowing the source to charge the
-capacitor, pulling the voltage up).
-
-\subsection{Why Is the Conventional Method Slow?}
-
-\begin{warningbox}[Fundamental Limitation of PI Balancing]
-The PI controller generates $\Delta M_i$, which modifies the \emph{average}
-power delivery of each cell. But the relationship between modulation index
-change $\Delta M_i$ and power change $\Delta P_i$ is indirect and
-gain-limited: the correction is small compared to the rated modulation
-depth (otherwise the grid current distorts). This small correction acts
-against the large stored energy in $C_{dc,i}$.
-
-Result: the PI must integrate slowly over many cycles to accumulate enough
-energy transfer. Measured settling time: $\sim$\,1850\,ms.
-
-The proposed method bypasses this limitation by \emph{directly setting} the
-loading power of each cell --- a fundamentally faster degree of freedom.
+\begin{warningbox}[Why Is the Conventional Method Slow?]
+The PI generates only a small $\Delta M_i$ per cycle --- otherwise the grid
+current distorts. This small correction acts against the large stored energy
+in $C_{dc,i}$, forcing the PI to integrate slowly over many cycles.
+Measured settling time: $\sim$\,1850\,ms. The proposed method bypasses
+this by \emph{directly setting} the loading power --- a fundamentally
+faster degree of freedom.
 \end{warningbox}
 
 \clearpage
@@ -412,72 +300,48 @@ loading power of each cell --- a fundamentally faster degree of freedom.
 \label{sec:loading_power}
 % ============================================================
 
-\subsection{The AC Power of a Single H-Bridge Cell}
+\subsection{Power at Each Cell}
 
-Each cell $i$ produces an AC output voltage $v_i(t)$. The instantaneous
-power delivered to the grid by cell $i$ is:
+Each cell $i$ produces AC output voltage $v_i(t)$. The instantaneous power
+it delivers to the grid is $p_i(t) = v_i(t) \cdot \ig(t)$.
+
+With sinusoidal grid current $\ig(t) = \Ig\sin(\omg t)$ and non-clamped
+modulation $v_i(t) = \Vdci{i}\Mi\sin(\omg t)$:
 \[
-    p_i(t) = v_i(t) \cdot \ig(t)
+    p_i(t) = \frac{\Vdci{i}\Mi\Ig}{2}
+             \bigl[\cos(\phig) - \cos(2\omg t - \phig)\bigr]
 \]
 
-The grid current is sinusoidal:
+The \emph{average} (real) power delivered to the grid:
 \[
-    \ig(t) = \Ig \sin(\omg t)
+    \langle p_i \rangle = \frac{\Vdci{i}\Mi\Ig}{2}\cos(\phig)
 \]
 
-For a standard sinusoidal (non-clamped) modulation with index $\Mi$ and
-DC-link voltage $\Vdci{i}$, the cell output voltage is:
-\[
-    v_i(t) = \Vdci{i} \cdot \Mi \cdot \sin(\omg t + \theta_i)
-\]
+\subsection{Loading Power Definition}
 
-where $\theta_i$ is the phase shift of cell $i$'s reference (all cells
-share the same phase in single-phase operation: $\theta_i = 0$).
-
-\subsection{The DC-Link Capacitor Power Balance}
-
-The DC source of cell $i$ delivers power $P_{i,\mathrm{src}}$ into the DC-link.
-The H-bridge extracts power $p_i(t)$ from the DC-link and delivers it to the
-grid. The net power flowing into the capacitor is:
-\[
-    p_{C,i}(t) = P_{i,\mathrm{src}} - p_i(t)
-\]
-
-The \textbf{loading power} $\PH$ is defined as the \emph{average} net power
-flow through the DC-link capacitor over one fundamental cycle. If we define
-the average of $p_i(t)$ as $\langle p_i \rangle$, then:
+The \textbf{loading power} $\PH$ is the net average power flowing into the
+DC-link capacitor:
 \[
     \PH = P_{i,\mathrm{src}} - \langle p_i \rangle
 \]
 
 \begin{itemize}
-    \item If $\PH > 0$: the capacitor is receiving net energy --- $\Vdci{i}$ \emph{rises}.
-    \item If $\PH < 0$: the capacitor is losing net energy --- $\Vdci{i}$ \emph{falls}.
-    \item If $\PH = 0$: the capacitor voltage is constant (balanced).
+    \item $\PH > 0$: capacitor is charging --- $\Vdci{i}$ \emph{rises}.
+    \item $\PH < 0$: capacitor is discharging --- $\Vdci{i}$ \emph{falls}.
+    \item $\PH = 0$: capacitor voltage is constant (balanced).
 \end{itemize}
 
-For balancing, we want to set $\PH$ for each cell to exactly whatever value
-drives $\Vdci{i}$ back to $V_{dc,\mathrm{ref}}$ as fast as possible.
-
 \begin{physbox}[Analogy: Loading Power as a Water Tap]
-Think of the DC-link capacitor as a water tank. The DC source is an inlet
-pipe (fills the tank at rate $P_{i,\mathrm{src}}$). The H-bridge is a drain
-(empties the tank at rate $p_i(t)$).
+The DC-link capacitor is a water tank. The DC source is an inlet pipe (fills
+at rate $P_{i,\mathrm{src}}$). The H-bridge is a drain (empties at rate
+$\langle p_i\rangle$). Loading power = inlet minus drain = net level change.
 
-Loading power $\PH$ = inlet rate minus drain rate = net change in tank level.
+To raise voltage: reduce the drain (smaller $\Mi$ $\Rightarrow$ less AC power extracted).
+To lower voltage: increase the drain (larger $\Mi$ $\Rightarrow$ more AC power extracted).
 
-To raise the voltage (charge the tank): set $\PH > 0$, i.e., make the drain
-smaller than the inlet. This means making the modulation index smaller so the
-H-bridge extracts less power.
-
-To lower the voltage (drain the tank): set $\PH < 0$, i.e., make the drain
-larger than the inlet. This means increasing the modulation contribution so the
-H-bridge extracts more power from the DC-link.
-
-The key insight of this paper: \emph{the modulation strategy (clamped vs.
-non-clamped) directly sets the average drain rate}, so by choosing the
-modulation, we set $\PH$ directly and immediately --- without waiting for a
-slow PI to integrate.
+The key insight: the modulation strategy (clamped vs.\ non-clamped) directly
+sets the drain rate --- so by choosing the modulation, $\PH$ is set immediately,
+without waiting for a PI to integrate.
 \end{physbox}
 
 \clearpage
@@ -486,53 +350,32 @@ slow PI to integrate.
 \label{sec:clamped}
 % ============================================================
 
-\figentry{fig:P3Fig7}{P3_page04_render.png}%
-{Full page 4 render. \textbf{Fig.\,7 (Clamped modulation signal)} appears
-on this page. It shows the modulation reference waveform with the clamped
-(flat-top) regions defined by the clamping angle $\phic$.
-Crop to \texttt{P3\_Fig7\_clamped\_modulation\_signal.png}.
-Also visible on this page: Fig.\,8 (3D loading power surfaces) and Fig.\,9.}{0.6}
+\figentry{fig:P3Fig7}{P3_Fig7_page04.png}%
+{Fig.\,7 --- Clamped modulation reference signal. The sinusoidal reference
+ is held at $\pm 1$ during the clamped intervals (flat-top sections near
+ the peaks). The clamping angle $\phic$ controls the fraction of the cycle
+ that is clamped. Larger $\phic$ $\Rightarrow$ wider flat-top regions.}{0.80}
 
 \subsection{Non-Clamped (Standard Sinusoidal) Modulation}
 
-In \textbf{non-clamped} modulation, the reference signal for cell $i$ is a
-pure sinusoid:
-\[
-    \vref^{\mathrm{nc}}(t) = \Mi \cdot \sin(\omg t)
-\]
-
-The modulation index $\Mi \leq 1$ at all times (never hits the rail).
-The H-bridge switches continuously throughout the cycle --- the duty cycle
-varies smoothly.
-
-The average (active) power delivered to the grid is:
-\[
-    \langle p_i \rangle^{\mathrm{nc}}
-    = \frac{\Vdci{i} \cdot \Mi \cdot \Ig}{2} \cos(\phig)
-\]
-
-The loading power for non-clamped operation is a function of $\Mi$, $\Ig$,
-and the power factor angle $\phig$.
+Reference: $\vref^{\mathrm{nc}}(t) = \Mi\sin(\omg t)$.
+The H-bridge switches continuously; the duty cycle varies smoothly. $\Mi \leq 1$
+at all times. Average power to grid: $\frac{\Vdci{i}\Mi\Ig}{2}\cos(\phig)$.
 
 \subsection{Clamped Modulation}
 
-In \textbf{clamped} modulation, the reference signal is clamped to $\pm 1$
-during portions of the cycle where it would otherwise be near the rails.
-The clamped region is controlled by the \textbf{clamping angle} $\phic$:
-
+During portions of the cycle where the sinusoidal reference is near $\pm 1$,
+the reference is clamped to exactly $\pm 1$:
 \[
     \vref^{\mathrm{cl}}(t) =
     \begin{cases}
-        +1 & \text{if } \Mi\sin(\omg t) > \cos(\phic) \\
-        -1 & \text{if } \Mi\sin(\omg t) < -\cos(\phic) \\
+        +1 & \text{if } \Mi\sin(\omg t) \geq \cos(\phic) \\
+        -1 & \text{if } \Mi\sin(\omg t) \leq -\cos(\phic) \\
         \Mi\sin(\omg t) & \text{otherwise}
     \end{cases}
 \]
-
-When the reference is clamped to $+1$: the upper switch of the H-bridge is
-fully on (no switching). When clamped to $-1$: the lower switch is fully on.
-During clamped intervals, there are \emph{no switching losses} and the cell
-output is simply $\pm \Vdci{i}$.
+During clamped intervals: one switch is fully on, no switching losses, and
+the cell output is exactly $\pm\Vdci{i}$.
 
 \begin{statebox}
 \renewcommand{\arraystretch}{1.3}
@@ -540,31 +383,22 @@ output is simply $\pm \Vdci{i}$.
 \toprule
 \textbf{Symbol} & \textbf{Quantity} & \textbf{Notes} \\
 \midrule
-$\Mi$    & Modulation index, cell $i$  & $0 \leq \Mi \leq 1$; sets fundamental output amplitude \\
-$\phic$  & Clamping angle              & $0 \leq \phic \leq \pi/2$; controls how much of cycle is clamped \\
-         &                             & $\phic = 0$ $\Rightarrow$ no clamping (pure sinusoidal) \\
-         &                             & $\phic = \pi/2$ $\Rightarrow$ fully clamped (always at $\pm 1$) \\
-$\phig$  & Power factor angle          & Angle between $\vg$ and $\ig$; fixed by load \\
-$\PHnc$  & Loading power, non-clamped  & Function of $\Mi$, $\Ig$, $\phig$ only \\
-$\PHcl$  & Loading power, clamped      & Function of $\Mi$, $\phic$, $\Ig$, $\phig$ \\
+$\Mi$   & Modulation index, cell $i$ & $0 \leq \Mi \leq 1$ \\
+$\phic$ & Clamping angle & $0$ (no clamping) to $\pi/2$ (fully clamped) \\
+$\phig$ & Power factor angle & Fixed by load \\
+$\PHnc$ & Non-clamped loading power & Function of $\Mi$ only \\
+$\PHcl$ & Clamped loading power & Function of $\Mi$ and $\phic$ \\
 \bottomrule
 \end{tabular}
 \end{statebox}
 
-\begin{physbox}[Why Does Clamping Change the Loading Power?]
-When the reference is clamped, the H-bridge output voltage during the clamped
-interval is exactly $\pm \Vdci{i}$ (a DC level), not a PWM-averaged fraction.
-The power extracted from the DC-link during the clamped interval is
-$\pm \Vdci{i} \cdot \ig(t)$ instantaneously.
-
-By varying $\phic$, the fraction of the cycle that is clamped changes.
-This changes the total energy extracted per cycle --- i.e., the loading power
-$\PH$.
-
-The clamped and non-clamped modes therefore give different loading powers for
-the same grid current, even with the same fundamental amplitude. This
-\emph{extra degree of freedom} (clamped vs.\ non-clamped, and the choice of
-$\phic$) is what the proposed algorithm exploits for fast balancing.
+\begin{physbox}[Why Does Clamping Change Loading Power?]
+When clamped, the cell output is a DC level $(\pm\Vdci{i})$ during the
+clamped intervals rather than a PWM fraction. The energy extracted per cycle
+changes. By varying $\phic$, the fraction of the cycle that is clamped
+changes --- giving an extra degree of freedom ($\phic$) for setting $\PH$.
+Non-clamped cells have only $\Mi$ as a free variable. This extra freedom
+is what the sorting algorithm exploits.
 \end{physbox}
 
 \clearpage
@@ -573,78 +407,53 @@ $\phic$) is what the proposed algorithm exploits for fast balancing.
 \label{sec:algorithm}
 % ============================================================
 
-\subsection{The Core Idea}
-
-The proposed method decides, at the start of each fundamental cycle:
-\begin{enumerate}
-    \item Which cells need their DC-link \emph{charged} (voltage too low)?
-    \item Which cells need their DC-link \emph{discharged} (voltage too high)?
-    \item For each cell, what modulation strategy (clamped or non-clamped)?
-    \item What values of $\Mi$ and $\phic$?
-\end{enumerate}
-
-The answer comes from \textbf{sorting by required loading power} and
-assigning modes accordingly.
-
-\figentry{fig:P3Fig4}{P3_page03_render.png}%
-{Full page 3 render (same as \figref{fig:P3Fig3}). \textbf{Fig.\,4 (Sorting
-algorithm flowchart)} is on this page. Crop to
-\texttt{P3\_Fig4\_sorting\_algorithm.png}.}{0.6}
+\figentry{fig:P3Fig4}{P3_Fig4_page03.png}%
+{Fig.\,4 --- Proposed sorting algorithm flowchart. Cells are sorted by
+ their required loading power correction direction, then assigned clamped
+ (discharge) or non-clamped (charge) modulation mode. The modulation
+ parameters $\Mi$ and $\phic$ are computed from closed-form loading
+ power expressions.}{0.75}
 
 \subsection{Algorithm Steps}
 
 \textbf{Step 1 --- Compute voltage errors.}
-For each cell $i$, compute the error from the reference:
-\[
-    \varepsilon_i = V_{dc,\mathrm{ref}} - \Vdci{i}
-\]
-A positive error means the cell is under-voltage (needs charging, $\PH > 0$).
-A negative error means the cell is over-voltage (needs discharging, $\PH < 0$).
+$\varepsilon_i = V_{dc,\mathrm{ref}} - \Vdci{i}$.
+Positive: cell is under-voltage (needs charging). Negative: over-voltage (needs discharging).
 
 \medskip
-\textbf{Step 2 --- Rank cells by error magnitude.}
-Sort the cells by $|\varepsilon_i|$ in descending order. The cell furthest
-from the target gets the most aggressive loading power correction.
+\textbf{Step 2 --- Sort by error magnitude.}
+Rank cells by $|\varepsilon_i|$ descending. The furthest-from-target cell
+gets the most aggressive correction.
 
 \medskip
 \textbf{Step 3 --- Assign modulation mode.}
 \begin{itemize}
-    \item Cells needing discharge ($\varepsilon_i < 0$): assign \textbf{clamped}
-          modulation with a large $\phic$ (high loading power drain).
-    \item Cells needing charge ($\varepsilon_i > 0$): assign \textbf{non-clamped}
-          modulation to maximize loading power input.
+    \item Over-voltage cells ($\varepsilon_i < 0$) $\rightarrow$ \textbf{clamped mode}
+          (higher loading power drain, faster discharge).
+    \item Under-voltage cells ($\varepsilon_i > 0$) $\rightarrow$ \textbf{non-clamped mode}
+          (maximize loading power input, faster charge).
 \end{itemize}
 
 \medskip
 \textbf{Step 4 --- Compute $\Mi$ and $\phic$.}
 Using the loading power expressions (Section~\ref{sec:loading_power_derivation}),
-find the $\Mi$ and $\phic$ that give the exact $\PH$ required to drive
-$\varepsilon_i$ to zero in minimum time.
+find the exact values that drive $\varepsilon_i \to 0$ in minimum time.
 
 \medskip
-\textbf{Step 5 --- Verify constraint: total voltage sum.}
-The per-cell modulation references must still produce the correct grid
-voltage. The outer loop sets the constraint:
+\textbf{Step 5 --- Verify total voltage constraint.}
 \[
-    \sum_{i=1}^{n} v_i^{\mathrm{fund}}(t) = \Vtot \cdot M_{\mathrm{base}} \cdot \sin(\omg t)
+    \sum_{i=1}^{n} \Vdci{i}\Mi\sin(\omg t + \theta_i)
+    = \Vtot \cdot M_{\mathrm{ref}} \cdot \sin(\omg t)
 \]
-Adjust $\Mi$ values proportionally if needed to satisfy this constraint.
+Adjust $\Mi$ values if needed to satisfy this constraint.
 
 \begin{physbox}[Why Is This Faster Than PI?]
-The PI method changes $\Delta M_i$ by a small increment each cycle, limited
-by stability. The integral accumulates over many cycles before the voltage
-is corrected.
-
-The sorting algorithm directly \emph{sets} the loading power target. Instead
-of nudging $M_i$ by $\Delta M_i$ and waiting for the energy to integrate, the
-algorithm computes the exact modulation parameters that deliver the required
-$\PH$ in one step.
-
-This is the difference between slowly adjusting a tap (PI) vs.\ opening a
-valve all the way and calculating exactly when to close it (sorting algorithm).
-
-Measured result: 140\,ms settling time vs.\ 1850\,ms for the PI approach
---- a factor of 13$\times$ faster.
+PI changes $\Delta M_i$ by a small increment each cycle, limited by stability.
+The sorting algorithm directly \emph{sets} the loading power target and
+computes the exact $\Mi$, $\phic$ that deliver it. This is the difference
+between slowly adjusting a tap (PI) vs.\ opening a valve all the way and
+computing exactly when to close it. Result: 140\,ms vs.\ 1850\,ms --- a
+factor of 13$\times$ faster.
 \end{physbox}
 
 \clearpage
@@ -653,83 +462,37 @@ Measured result: 140\,ms settling time vs.\ 1850\,ms for the PI approach
 \label{sec:two_cell}
 % ============================================================
 
-\figentry{fig:P3Fig5}{P3_page03_render.png}%
-{Full page 3 render. \textbf{Fig.\,5 (Two-cell case)} is on this page.
-It shows the clamped and non-clamped regions in the $(M, \phic)$ operating
-plane for the two-cell case. Crop to \texttt{P3\_Fig5\_two\_cell\_case.png}.}{0.6}
+\figentry{fig:P3Fig5}{P3_Fig5_page03.png}%
+{Fig.\,5 --- Two-cell case study showing the feasible clamped and
+ non-clamped operating regions in the $(M,\,\phic)$ plane. The algorithm
+ selects the operating point that delivers the required loading power
+ while satisfying the total modulation constraint.}{0.85}
 
-With $n = 2$ cells, the algorithm is simplest to understand.
+With $n = 2$ cells, suppose cell\,1 is over-voltage and cell\,2 is under-voltage.
 
-\subsection{Setup}
-
-Two cells: cell\,1 and cell\,2. Both contribute to the same grid current.
-The total modulation must satisfy:
-\[
-    M_1 \sin(\omg t) + M_2 \sin(\omg t) = M_{\mathrm{total}} \sin(\omg t)
-\]
-so $M_1 + M_2 = M_{\mathrm{total}}$ (in the balanced case).
-
-Suppose cell\,1 is over-voltage ($\Vdci{1} > V_{dc,\mathrm{ref}}$) and
-cell\,2 is under-voltage ($\Vdci{2} < V_{dc,\mathrm{ref}}$).
-
-\subsection{Assignment}
-
-The algorithm assigns:
-\begin{itemize}
-    \item \textbf{Cell\,1} (over-voltage, needs discharge): \textbf{clamped mode},
-          with $\phic > 0$. The clamped mode increases the loading power drain
-          from cell\,1's DC-link, causing $\Vdci{1}$ to fall.
-    \item \textbf{Cell\,2} (under-voltage, needs charge): \textbf{non-clamped mode},
-          maximizing the loading power input into cell\,2's DC-link, causing
-          $\Vdci{2}$ to rise.
-\end{itemize}
-
-The modulation indices $M_1$, $M_2$, and the clamping angle $\phic$ of
-cell\,1 are computed from the loading power expressions so that both cells
-reach $V_{dc,\mathrm{ref}}$ simultaneously.
-
-\subsection{Clamped vs.\ Non-Clamped Regions in the Operating Plane}
-
-The figure (Fig.\,5) shows which combinations of $M$ and $\phic$ are feasible
-for the clamped and non-clamped cells. Not all $(M, \phic)$ points are
-reachable simultaneously --- the two cells share the total modulation budget
-$M_{\mathrm{total}}$. The algorithm searches within the feasible region for
-the optimal point.
-
-\begin{physbox}[What the Two-Cell Case Shows]
-The two-cell case makes it clear that the clamped/non-clamped assignment is
-not arbitrary. Assigning the over-voltage cell to clamped mode (not
-non-clamped) is deliberate: clamped mode gives higher loading power drain
-per unit modulation index, which is exactly what is needed to bring an
-over-voltage cell down quickly.
-
-Assigning the under-voltage cell to non-clamped mode maximizes the loading
-power input (charging the DC-link). The non-clamped cell absorbs energy from
-the grid current during all parts of the cycle --- not just the clamped
-intervals.
-\end{physbox}
+The algorithm assigns cell\,1 to \textbf{clamped mode} and cell\,2 to
+\textbf{non-clamped mode}. The clamped mode gives cell\,1 a higher loading
+power drain (faster discharge); the non-clamped mode maximizes loading power
+input into cell\,2 (faster charge). The values of $M_1$, $M_2$, $\phic$ are
+solved so that both cells reach $V_{dc,\mathrm{ref}}$ simultaneously while
+the total modulation sum remains correct.
 
 \clearpage
 % ============================================================
-\section{Four-Cell Extension and Five Operating Cases}
+\section{Four-Cell Extension: Five Operating Cases}
 \label{sec:four_cell}
 % ============================================================
 
-\figentry{fig:P3Fig6}{P3_page04_render.png}%
-{Full page 4 render. \textbf{Fig.\,6 (Five cases for four cells)} may appear
-on this page. It shows the five possible assignments of clamped and non-clamped
-modes when four cells are present, depending on how many cells need charge vs.\
-discharge. Crop to \texttt{P3\_Fig6\_five\_cases\_four\_cells.png}.}{0.6}
-
-With $n = 4$ cells, the number of cells needing discharge vs.\ charge can
-range from 0:4 to 4:0. The paper identifies \textbf{five distinct cases}
-based on this split:
+\figentry{fig:P3Fig6}{P3_Fig6_page04.png}%
+{Fig.\,6 --- Five distinct cases for four cells, depending on how many cells
+ need discharge vs.\ charge. Case I: all non-clamped. Cases II--IV: mixed
+ assignments. Case V: all clamped.}{0.75}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.3}
 \begin{tabular}{clll}
 \toprule
-\textbf{Case} & \textbf{Cells to discharge} & \textbf{Cells to charge} & \textbf{Mode assignment} \\
+\textbf{Case} & \textbf{Discharge} & \textbf{Charge} & \textbf{Mode assignment} \\
 \midrule
 I   & 0 & 4 & All non-clamped \\
 II  & 1 & 3 & 1 clamped + 3 non-clamped \\
@@ -740,22 +503,11 @@ V   & 4 & 0 & All clamped \\
 \end{tabular}
 \end{center}
 
-For each case, the loading power constraints produce a set of equations for
-the unknown modulation indices and clamping angles. The sorting algorithm
-solves these equations using the closed-form loading power expressions.
-
 \begin{physbox}[Symmetry of the Five Cases]
-Cases I and V are symmetric: all cells either need charge (Case I) or all
-need discharge (Case V). In these cases all cells get the same mode, and the
-balancing is symmetric.
-
-Cases II--IV are asymmetric: some cells get clamped mode, others non-clamped.
-The loading power difference between the two modes drives the inter-cell
-energy redistribution.
-
-In practice, Cases II--IV are the most common during transients, since
-balanced starting conditions rarely have all cells on the same side of the
-target.
+Cases I and V are symmetric: all cells on the same side of the target.
+Cases II--IV are the most common during transients. In each case, the sorting
+algorithm solves the loading power constraints to find the optimal
+$\{\Mi,\phic\}$ set for that case.
 \end{physbox}
 
 \clearpage
@@ -766,163 +518,74 @@ target.
 
 \subsection{Non-Clamped Loading Power $\PHnc$}
 
-For a cell in non-clamped mode, the output voltage is:
 \[
-    v_i(t) = \Vdci{i} \cdot \Mi \cdot \sin(\omg t)
+    \boxed{\PHnc(\Mi)
+    = P_{i,\mathrm{src}} - \frac{\Vdci{i}\Mi\Ig}{2}\cos(\phig)}
 \]
 
-The instantaneous power from the DC-link to the grid:
-\[
-    p_i(t) = \Vdci{i} \cdot \Mi \cdot \sin(\omg t) \cdot \Ig \sin(\omg t - \phig)
-\]
-
-Expanding using the product-to-sum identity:
-\[
-    p_i(t) = \frac{\Vdci{i} \cdot \Mi \cdot \Ig}{2}
-             \left[\cos(\phig) - \cos(2\omg t - \phig)\right]
-\]
-
-The first term is the average (DC) power --- real power to the grid.
-The second term is a double-frequency ripple that alternately charges and
-discharges $C_{dc,i}$. The \textbf{average} is:
-\[
-    \langle p_i \rangle^{\mathrm{nc}} = \frac{\Vdci{i} \cdot \Mi \cdot \Ig}{2} \cos(\phig)
-\]
-
-The loading power (net power into the capacitor) is:
-\[
-    \boxed{\PHnc = P_{i,\mathrm{src}} - \frac{\Vdci{i} \cdot \Mi \cdot \Ig}{2} \cos(\phig)}
-\]
-
-To \emph{increase} $\PHnc$ (charge the capacitor): decrease $\Mi$. Less power
-extracted from the DC-link means more stays in the capacitor.
+To increase $\PHnc$ (charge the capacitor): decrease $\Mi$.
+One free variable: $\Mi$.
 
 \subsection{Clamped Loading Power $\PHcl$}
 
-For clamped modulation, the output voltage is no longer a pure sinusoid.
-During the clamped intervals (when the reference hits $\pm 1$), $v_i = \pm\Vdci{i}$.
-
-The average power is computed by integrating over one full cycle, treating
-the sinusoidal and clamped intervals separately. The result (from Fourier
-analysis of the clamped waveform) is:
-
+The clamped output voltage has non-sinusoidal content; the average power
+integral over one cycle gives:
 \[
-    \langle p_i \rangle^{\mathrm{cl}}
-    = \frac{\Vdci{i} \cdot \Ig}{2\pi}
-      \left[ \Mi \pi \cos(\phig) + 2 \cos(\phic)\sin(\phig) \right]
-    \quad \text{[single-phase, unity fundamental]}
+    \boxed{\PHcl(\Mi,\phic)
+    = P_{i,\mathrm{src}} - \frac{\Vdci{i}\Ig}{2\pi}
+      \bigl[\Mi\pi\cos(\phig) + 2\cos(\phic)\sin(\phig)\bigr]}
 \]
 
-\begin{warningbox}[Note: Verify Against Paper]
-The exact coefficient form above should be verified against the paper's
-equation for $P_H^{cl}$. The key structure is correct: $\PHcl$ depends on
-\emph{both} $\Mi$ and $\phic$, giving the algorithm two degrees of freedom
-for the clamped cells. The non-clamped cells have only $\Mi$ as a free
-variable (one degree of freedom).
+Two free variables: $\Mi$ and $\phic$. This is the extra degree of freedom
+that allows the clamped mode to deliver more loading power than the
+non-clamped mode.
+
+\begin{warningbox}[Verify Against Paper]
+The coefficient form above captures the correct structure. Verify the exact
+integral limits and trigonometric identities against the paper's derivation
+before using these equations in calculations.
 \end{warningbox}
 
 \begin{eqnbox}[Summary: Loading Power Expressions]
-\textbf{Non-clamped cell} (one free variable: $\Mi$):
+\textbf{Non-clamped} (1 free variable: $\Mi$):
 \[
-    \PHnc(\Mi)
-    = P_{i,\mathrm{src}} - \frac{\Vdci{i} \cdot \Mi \cdot \Ig}{2} \cos(\phig)
+    \PHnc = P_{i,\mathrm{src}} - \frac{\Vdci{i}\Mi\Ig}{2}\cos(\phig)
 \]
 
-\textbf{Clamped cell} (two free variables: $\Mi$, $\phic$):
+\textbf{Clamped} (2 free variables: $\Mi$, $\phic$):
 \[
-    \PHcl(\Mi, \phic)
-    = P_{i,\mathrm{src}} - \frac{\Vdci{i} \cdot \Ig}{2\pi}
-      \left[ \Mi \pi \cos(\phig) + 2\cos(\phic)\sin(\phig) \right]
+    \PHcl = P_{i,\mathrm{src}} - \frac{\Vdci{i}\Ig}{2\pi}
+            \bigl[\Mi\pi\cos(\phig) + 2\cos(\phic)\sin(\phig)\bigr]
 \]
 
 \textbf{Constraint} (total grid voltage):
 \[
-    \sum_{i=1}^{n} \Vdci{i} \cdot \Mi \cdot \sin(\omg t + \theta_i)
-    = \Vtot \cdot M_{\mathrm{ref}} \cdot \sin(\omg t)
+    \sum_{i=1}^{n}\Vdci{i}\Mi = \Vtot\cdot M_{\mathrm{ref}}
 \]
-
-The sorting algorithm solves these equations simultaneously for all cells
-to find the optimal $\{\Mi, \phic\}$ set.
 \end{eqnbox}
 
 \clearpage
 % ============================================================
-\section{Loading Power Surface: 3D Visualization (Fig.\,8)}
+\section{Loading Power Surfaces (Fig.\,8)}
 \label{sec:3d_surface}
 % ============================================================
 
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8a_3D_clamped_loading_power.png}
-        \caption{Clamped mode loading power $\PHcl$ as a function of
-                 modulation index $M$ and clamping angle $\phic$.}
-        \label{fig:P3Fig8a}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8b_3D_nonclamped_loading_power.png}
-        \caption{Non-clamped mode loading power $\PHnc$ as a function of
-                 modulation index $M$.}
-        \label{fig:P3Fig8b}
-    \end{subfigure}
-    \caption{Fig.\,8 --- Loading power surfaces for clamped and non-clamped modes
-             [verify figure identification against paper].}
-    \label{fig:P3Fig8}
-\end{figure}
+\figentry{fig:P3Fig8}{P3_Fig8_page04.png}%
+{Fig.\,8 --- 3D loading power surfaces as functions of modulation index $M$
+ and clamping angle $\phic$. Clamped mode surface (left): $\PHcl(M,\phic)$
+ shows the two-variable freedom. Non-clamped mode (right): $\PHnc(M)$ is a
+ 1D curve showing the single-variable constraint. The algorithm uses these
+ surfaces to look up $(M,\phic)$ pairs for any required $\PH$.}{0.90}
 
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8c_loading_power_strip.png}
-        \caption{Companion panel (c).}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8d_loading_power_strip.png}
-        \caption{Companion panel (d).}
-    \end{subfigure}
-    \\[6pt]
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8e_loading_power_strip.png}
-        \caption{Companion panel (e).}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig8f_loading_power_strip.png}
-        \caption{Companion panel (f).}
-    \end{subfigure}
-    \caption{Fig.\,8 additional panels --- verify these against paper.
-             They may show 2D projections of the loading power surface
-             at fixed $M$ or $\phic$ values, or may belong to Fig.\,7
-             (clamped modulation waveforms).}
-    \label{fig:P3Fig8strips}
-\end{figure}
+\begin{physbox}[Reading the Loading Power Surface]
+\textbf{Clamped surface axes:}
+x = modulation index $M$; y = clamping angle $\phic$; z = loading power $\PH$.
 
-\begin{physbox}[Reading the 3D Surface]
-The 3D surface plots show:
-\begin{itemize}
-    \item \textbf{x-axis}: modulation index $M$ (0 to 1)
-    \item \textbf{y-axis}: clamping angle $\phic$ (0 to $\pi/2$, clamped mode only)
-    \item \textbf{z-axis}: loading power $\PH$ (in Watts, normalized, or per-unit)
-\end{itemize}
-
-For the \textbf{clamped surface}: at $\phic = 0$ (no clamping) the surface
-matches the non-clamped value. As $\phic$ increases, the loading power changes
-because the output voltage waveform shape changes. The surface shows the
-full range of achievable $\PH$ values by varying both $M$ and $\phic$.
-
-For the \textbf{non-clamped surface}: it is a 2D curve (function of $M$ only),
-shown as a flat ribbon on the 3D axes.
-
-The algorithm uses these surfaces to look up the $(M, \phic)$ that achieves
-the required $\PH$ for each cell.
+At $\phic = 0$: clamped surface matches the non-clamped curve (no clamping
+= pure sinusoidal). As $\phic$ increases, the achievable loading power range
+expands. The maximum loading power (most aggressive correction) lies at the
+outer edge of the clamped surface. This expanded range is why the proposed
+method is faster than the PI method.
 \end{physbox}
 
 \clearpage
@@ -931,33 +594,24 @@ the required $\PH$ for each cell.
 \label{sec:performance_comparison}
 % ============================================================
 
-\figentry{fig:P3Fig9}{P3_Fig9_max_loading_power_comparison.png}%
-{Fig.\,9 --- Maximum achievable loading power as a function of modulation
- index $M$, comparing the proposed sorting algorithm (solid) to the
- conventional PI-based method (dashed). The proposed method achieves higher
- maximum loading power across the full range of $M$, enabling faster
- DC-link voltage balancing.}{0.85}
+\figentry{fig:P3Fig9}{P3_Fig9_page04.png}%
+{Fig.\,9 --- Maximum achievable loading power $|\PH|_{\max}$ vs.\ modulation
+ index $M$, comparing proposed sorting algorithm (solid) to conventional
+ PI method (dashed). The proposed method achieves higher maximum loading
+ power across the full range of $M$, enabling faster balancing.}{0.75}
 
 \begin{physbox}[What Fig.\,9 Shows and Why It Matters]
-Fig.\,9 plots the maximum loading power $|\PH|_{\max}$ achievable at each
-modulation index $M$, for both the conventional and proposed methods.
-
-A higher maximum loading power means:
-\begin{itemize}
-    \item More energy can be transferred per cycle.
-    \item A larger voltage error can be corrected in the same amount of time.
-    \item Or equivalently: the same voltage error is corrected in less time.
-\end{itemize}
-
-The proposed algorithm is better because:
+A higher $|\PH|_{\max}$ means more energy transferred per cycle, so any
+voltage error is corrected faster. The proposed algorithm is better because:
 \begin{enumerate}
-    \item It uses \emph{both} $M$ and $\phic$ as free variables (clamped cells),
-          giving more combinations that achieve high $|\PH|$.
-    \item The sorting step ensures the most favorable mode (clamped vs.\
-          non-clamped) is always assigned to each cell.
-    \item The conventional PI method is limited to small $\Delta M$ corrections
-          (otherwise it distorts the current), capping the achievable loading power.
+    \item Clamped cells use both $M$ and $\phic$, giving a wider range of
+          achievable $|\PH|$.
+    \item The sorting step always assigns the most favorable mode to each cell.
+    \item The PI is limited to small $\Delta M$ corrections, capping its
+          achievable loading power.
 \end{enumerate}
+The speedup factor $\approx 13\times$ reflects the ratio
+$|\PH|_{\max}^{\mathrm{proposed}} / |\PH|_{\max}^{\mathrm{conv}}$.
 \end{physbox}
 
 \clearpage
@@ -966,97 +620,31 @@ The proposed algorithm is better because:
 \label{sec:simulation}
 % ============================================================
 
-\subsection{Fig.\,10 --- Simulation: Conventional vs.\ Proposed Control}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10a_sim_conv_vdc.png}
-        \caption{Conventional: DC-link voltages $\Vdci{i}$.}
-        \label{fig:P3Fig10a}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10d_sim_prop_vdc.png}
-        \caption{Proposed: DC-link voltages $\Vdci{i}$.}
-        \label{fig:P3Fig10d}
-    \end{subfigure}
-    \\[4pt]
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10b_sim_conv_Pload.png}
-        \caption{Conventional: loading powers $\PHi{i}$.}
-        \label{fig:P3Fig10b}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10e_sim_prop_Pload.png}
-        \caption{Proposed: loading powers $\PHi{i}$.}
-        \label{fig:P3Fig10e}
-    \end{subfigure}
-    \\[4pt]
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10c_sim_conv_modindex.png}
-        \caption{Conventional: modulation indices $\Mi$.}
-        \label{fig:P3Fig10c}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig10f_sim_prop_modindex.png}
-        \caption{Proposed: modulation indices $\Mi$.}
-        \label{fig:P3Fig10f}
-    \end{subfigure}
-    \caption{Fig.\,10 --- Simulation comparison. Left column: conventional
-             PI balancing. Right column: proposed sorting algorithm. Top row:
-             DC-link voltages. Middle row: loading powers. Bottom row:
-             modulation indices.}
-    \label{fig:P3Fig10}
-\end{figure}
+\figentry{fig:P3Fig10}{P3_Fig10_page05.png}%
+{Fig.\,10 --- Simulation comparison (6-panel, $2\times3$ grid). Left column:
+ conventional PI balancing. Right column: proposed sorting algorithm.
+ Row 1: DC-link voltages $\Vdci{i}$. Row 2: loading powers $\PHi{i}$.
+ Row 3: modulation indices $\Mi$.
+ The proposed method converges in $\sim$140\,ms vs.\ $\sim$1850\,ms for
+ the conventional method.}{0.90}
 
 \begin{physbox}[How to Read Fig.\,10]
-\textbf{Row 1 (DC-link voltages)}: shows how fast the voltages converge to
-the common reference. The proposed method converges in $\sim$140\,ms; the
-conventional method in $\sim$1850\,ms (see Fig.\,14 for experimental confirmation).
+\textbf{Row 1 (DC-link voltages)}: convergence speed is the key metric.
+Proposed: fast step-like convergence within 7 fundamental cycles.
+Conventional: slow exponential approach over $\sim$92 cycles.
 
-\textbf{Row 2 (loading powers)}: shows the instantaneous $\PHi{i}$ during
-the transient. Conventional: $\PHi{i}$ changes slowly as the PI integrates.
-Proposed: $\PHi{i}$ is set to the maximum achievable value immediately at
-$t = 0$, then pulled back to zero as the voltages converge.
+\textbf{Row 2 (loading powers)}: Proposed sets $\PHi{i}$ to maximum
+immediately at $t=0$, then pulls back as voltages converge. Conventional:
+$\PHi{i}$ changes slowly as the PI integrates.
 
-\textbf{Row 3 (modulation indices)}: shows the per-cell $\Mi$ changing during
-the transient. Conventional: small incremental changes. Proposed: large step
-changes at $t = 0$ (maximum correction), then gradual return to steady-state
-values.
+\textbf{Row 3 (modulation indices)}: Proposed makes a large step change
+at $t=0$ (full correction), then returns to steady-state values.
+Conventional: only small incremental changes per cycle.
 \end{physbox}
 
-\clearpage
-
-\subsection{Fig.\,11 --- Simulation: Maximum Performance Comparison}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig11a_maxperf_conventional.png}
-        \caption{Maximum performance: conventional method.}
-        \label{fig:P3Fig11a}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig11b_maxperf_proposed.png}
-        \caption{Maximum performance: proposed method.}
-        \label{fig:P3Fig11b}
-    \end{subfigure}
-    \caption{Fig.\,11 --- Maximum achievable balancing performance comparison
-             between conventional and proposed methods.}
-    \label{fig:P3Fig11}
-\end{figure}
+\figentry{fig:P3Fig11}{P3_Fig11_page06.png}%
+{Fig.\,11 --- Maximum balancing performance comparison between conventional
+ and proposed methods under the most demanding imbalance conditions.}{0.85}
 
 \clearpage
 % ============================================================
@@ -1064,127 +652,37 @@ values.
 \label{sec:experimental}
 % ============================================================
 
-\subsection{The Prototype (Fig.\,12)}
+\figentry{fig:P3Fig12}{P3_Fig12_page06.png}%
+{Fig.\,12 --- Three-cell CHB prototype. Specifications: $n=3$ cells,
+ grid 230\,V$_{\rm rms}$ single-phase, DC-link target $\Vdc=180$\,V per cell,
+ DC-link capacitance \SI{1100}{\micro\farad} per cell. Control implemented
+ on a DSP.}{0.85}
 
-\figentry{fig:P3Fig12}{P3_Fig12_prototype_photo.png}%
-{Fig.\,12 --- Three-cell CHB prototype used for experimental validation.
- Specifications: $n = 3$ cells, grid voltage 230\,V$_{\rm rms}$ (single-phase),
- DC-link voltage per cell: target $\Vdc = 180$\,V,
- DC-link capacitance: \SI{1100}{\micro\farad} per cell.}{0.7}
+\figentry{fig:P3Fig13}{P3_Fig13_page07.png}%
+{Fig.\,13 --- Steady-state experimental results under three different power
+ imbalance conditions. Each condition shows oscilloscope captures of
+ DC-link voltages and grid current with cell output voltages. All three
+ DC-link voltages are maintained at 180\,V despite unequal source powers;
+ the grid current remains sinusoidal.}{0.90}
 
-The prototype implements all three loops (outer, inner, balancing) on a
-DSP. The three cells have independently controllable DC-link sources (separate
-power supplies) to simulate unequal source powers.
-
-Steady-state and dynamic tests are performed by suddenly changing the source
-powers of one or more cells and measuring how fast the algorithm restores balance.
-
-\subsection{Steady-State Results (Fig.\,13)}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13a_exp_cond1_strip1.png}
-        \caption{Condition 1, waveform strip 1.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13b_exp_cond1_strip2.png}
-        \caption{Condition 1, waveform strip 2.}
-    \end{subfigure}
-    \\[4pt]
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13c_exp_cond2_strip1.png}
-        \caption{Condition 2, waveform strip 1.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13d_exp_cond2_strip2.png}
-        \caption{Condition 2, waveform strip 2.}
-    \end{subfigure}
-    \\[4pt]
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13e_exp_cond3_strip1.png}
-        \caption{Condition 3, waveform strip 1.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig13f_exp_cond3_strip2.png}
-        \caption{Condition 3, waveform strip 2.}
-    \end{subfigure}
-    \caption{Fig.\,13 --- Steady-state experimental results under three
-             different power imbalance conditions. Each condition shows two
-             oscilloscope strips: DC-link voltages (strip 1) and grid current
-             with cell output voltages (strip 2).}
-    \label{fig:P3Fig13}
-\end{figure}
-
-\begin{physbox}[Reading Fig.\,13]
-Each condition applies a different power imbalance across the three cells.
-The oscilloscope strips confirm:
-\begin{enumerate}
-    \item All three DC-link voltages remain at 180\,V despite unequal source
-          powers --- the algorithm maintains balance in steady state.
-    \item The grid current waveform remains sinusoidal --- the modulation
-          changes (clamped vs.\ non-clamped assignment) do not introduce
-          visible current distortion at the grid terminal.
-    \item The cell output voltages show the expected staircase pattern (3-level
-          approximation to a sinusoid).
-\end{enumerate}
-\end{physbox}
-
-\subsection{Dynamic Response (Fig.\,14)}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig14a_dynamic_conventional.png}
-        \caption{Conventional PI: settling time $\sim$1850\,ms.}
-        \label{fig:P3Fig14a}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{P3_Fig14b_dynamic_proposed.png}
-        \caption{Proposed algorithm: settling time $\sim$140\,ms.}
-        \label{fig:P3Fig14b}
-    \end{subfigure}
-    \caption{Fig.\,14 --- Dynamic response comparison. A step change in power
-             imbalance is applied at $t = 0$. The proposed algorithm restores
-             balance 13$\times$ faster than the conventional PI method.}
-    \label{fig:P3Fig14}
-\end{figure}
+\figentry{fig:P3Fig14}{P3_Fig14_page08.png}%
+{Fig.\,14 --- Dynamic response comparison. A step power imbalance is applied
+ at $t=0$. Left: conventional PI, settling time $\sim$1850\,ms. Right:
+ proposed sorting algorithm, settling time $\sim$140\,ms. Factor of
+ $13\times$ improvement.}{0.85}
 
 \begin{physbox}[The 13$\times$ Speedup --- Where Does It Come From?]
-\textbf{Conventional PI}: settling time 1850\,ms = 92.5 fundamental cycles
-at 50\,Hz. The PI integrates over many cycles with a limited correction
-per cycle (small $\Delta M$).
+\textbf{Conventional PI}: 1850\,ms = 92 fundamental cycles at 50\,Hz.
+The PI integrates with a small $\Delta M$ per cycle.
 
-\textbf{Proposed algorithm}: settling time 140\,ms = 7 fundamental cycles.
-The algorithm applies maximum-possible loading power correction from the
-first cycle. The correction is computed from the exact loading power
-expressions, not accumulated from an integral.
+\textbf{Proposed algorithm}: 140\,ms = 7 fundamental cycles. Maximum-possible
+loading power correction is applied from cycle one, computed directly from
+the closed-form expressions --- no integration needed.
 
-\medskip
-The speedup factor $\approx 13\times$ reflects the ratio of maximum achievable
-loading power between the two methods:
-\[
-    \text{speedup} \approx \frac{|\PH|_{\max}^{\mathrm{proposed}}}{|\PH|_{\max}^{\mathrm{conv}}}
-\]
-as shown analytically in Fig.\,9.
-
-\medskip
-The practical implication: in a grid-tied CHB inverter subject to rapid
+Practical implication: for a grid-tied CHB inverter subject to rapid
 irradiance transients (clouds, partial shading), the proposed method can
-rebalance the DC-link voltages within 3--4 fundamental cycles --- fast enough
-to prevent over-voltage even during rapid source power changes.
+rebalance DC-link voltages within 3--4 fundamental cycles --- fast enough
+to prevent over-voltage even during rapid source changes.
 \end{physbox}
 
 \clearpage
@@ -1194,35 +692,21 @@ to prevent over-voltage even during rapid source power changes.
 % ============================================================
 
 \begin{enumerate}
-    \item \textbf{The root cause of DC-link imbalance} is that each cell has
-          a different source power, but the same AC current flows through all
-          cells. Without active balancing, the voltages diverge.
-
-    \item \textbf{Loading power $\PH$} is the net power flowing into (or out of)
-          each cell's DC-link capacitor. Controlling $\PH$ directly controls the
-          rate of voltage change of $\Vdci{i}$.
-
-    \item \textbf{Clamped modulation} provides an extra degree of freedom (the
-          clamping angle $\phic$) for setting $\PH$. Non-clamped modulation has
-          only one degree of freedom ($\Mi$).
-
-    \item \textbf{The sorting algorithm} assigns clamped mode to cells needing
-          discharge (high loading power drain) and non-clamped mode to cells
-          needing charge (high loading power input), then solves for the exact
-          $\Mi$ and $\phic$ values.
-
-    \item \textbf{Speed advantage}: the proposed method applies maximum loading
-          power correction immediately (one fundamental cycle), vs.\ the PI
-          which integrates slowly. Result: 13$\times$ faster settling time
-          (140\,ms vs.\ 1850\,ms).
-
-    \item \textbf{Steady-state}: in balanced steady state, the algorithm reduces
-          to conventional modulation with no performance penalty.
-
-    \item \textbf{Grid current quality}: the modulation changes between cells
-          (clamped vs.\ non-clamped) do not significantly distort the total
-          grid current, since the sum of cell voltages still approximates a
-          sinusoid.
+    \item \textbf{Root cause}: different source powers + same AC current through
+          all cells = diverging DC-link voltages.
+    \item \textbf{Loading power $\PH$}: the net power into each cell's DC-link
+          capacitor. Controlling $\PH$ directly controls $\dot{V}_{dc,i}$.
+    \item \textbf{Clamped modulation}: adds a second free variable ($\phic$)
+          for setting $\PH$. Non-clamped has only $\Mi$.
+    \item \textbf{Sorting algorithm}: assigns clamped mode to over-voltage cells
+          (high drain), non-clamped to under-voltage cells (high charge), then
+          solves for exact $\Mi$, $\phic$ from closed-form expressions.
+    \item \textbf{Speed}: 13$\times$ faster than conventional PI (140\,ms vs.\
+          1850\,ms) because maximum loading power correction is applied immediately.
+    \item \textbf{Steady-state}: no performance penalty when balanced --- algorithm
+          reduces to conventional modulation.
+    \item \textbf{Grid current quality}: clamped vs.\ non-clamped assignments
+          do not significantly distort the total grid current.
 \end{enumerate}
 
 \end{document}
