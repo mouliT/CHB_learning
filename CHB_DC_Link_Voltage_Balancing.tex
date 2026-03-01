@@ -196,14 +196,43 @@ fully isolated from one another throughout.
 The total AC voltage presented to the grid is the series sum of all cell outputs:
 \[
     \vg(t) = v_1(t) + v_2(t) + \cdots + v_n(t)
-    = \ig \sum_{i=1}^{n} \Vdci{i}\Mi\sin(\omg t + \theta_i)
 \]
+
+In sinusoidal PWM, each cell's transistors switch at a carrier frequency
+$f_c \gg f$. The instantaneous output of cell $i$ is therefore a PWM waveform
+that alternates rapidly between $+\Vdci{i}$, $0$, and $-\Vdci{i}$ --- not a
+sinusoid. Averaged over one switching period, however, the \textbf{fundamental
+component} of cell $i$'s output is:
+\[
+    \bar{v}_i(t) = \Vdci{i} \cdot \Mi \cdot \sin(\omg t)
+\]
+
+Summing across all $n$ cells, the fundamental component of the total output is:
+\[
+    \bar{\vg}(t) = \left(\sum_{i=1}^{n} \Vdci{i}\,\Mi\right)\sin(\omg t)
+\]
+
+\begin{warningbox}[Three Caveats on This Equation]
+\begin{enumerate}
+    \item \textbf{Fundamental only.} The actual instantaneous $\vg(t)$ contains
+          high-frequency PWM harmonics on top of the sine. These are attenuated
+          --- not eliminated --- by the filter inductance $L_f$.
+    \item \textbf{No per-cell phase offset.} All cells in this paper share the
+          same sinusoidal reference phase. There is no $\theta_i$ offset between
+          cells in the voltage sum.
+    \item \textbf{Linear modulation only.} The relation $\bar{v}_i = \Vdci{i}\Mi\sin(\omg t)$
+          holds only for $\Mi \leq 1$ (non-clamped, linear region). Clamped
+          modulation --- the key contribution of this paper --- modifies this,
+          which is why later sections treat the clamped case separately.
+\end{enumerate}
+\end{warningbox}
 
 \textbf{Why bother stacking?} Each cell's capacitor only needs to support a
 fraction $\Vdci{i}$ of the total bus voltage, so low-voltage, low-cost
 transistors suffice. A 540\,V grid interface is built from three 180\,V cells.
-Staircase summation of cell voltages also approximates a sinusoid naturally,
-reducing output harmonics without a bulky filter.
+With sinusoidal PWM and phase-shifted carriers, $n$ cells together produce a
+$(2n{+}1)$-level output; more levels mean lower harmonic distortion and a
+smaller filter $L_f$.
 
 \begin{physbox}[Analogy Re-evaluated: The Torch Batteries]
 The torch analogy says: stack $n$ batteries in series; the total voltage is their
