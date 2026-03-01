@@ -232,27 +232,28 @@ fraction $\Vdci{i}$ of the total bus voltage, so low-voltage, low-cost
 transistors suffice. A 540\,V grid interface is built from three 180\,V cells.
 With sinusoidal PWM and phase-shifted carriers, $n$ cells together produce a
 $(2n{+}1)$-level output; more levels mean lower harmonic distortion and a
-smaller filter $L_f$ --- see \figref{fig:staircase_summation} and
-\figref{fig:staircase_buildup}.
+smaller filter $L_f$ --- see \figref{fig:staircase_buildup}.
 
-\figentry{fig:staircase_summation}{CHB_staircase_summation}%
-    {Effect of increasing the number of H-bridge cells on the PWM output
-     waveform. Each panel shows the summed output of $n = 1, 2, 3, 4$ cells
-     using unipolar sinusoidal PWM with phase-shifted carriers
-     ($f_c = 12f$, $M = 0.95$). The orange shading is the instantaneous
-     error between the PWM output and the ideal sinusoid. More cells yield
-     more voltage levels and a smaller error, reducing the harmonic content
-     and the required filter inductance $L_f$.}{1.0}
+% TODO: Add a side-by-side n=1..4 comparison figure here (Figure 1).
+%       Requirements: all panels on a normalised y-axis (v / n*Vdc) so the
+%       shrinking orange error region is visually obvious across panels.
+%       Defer until a clean Python figure meeting these criteria is ready.
 
 \figentry{fig:staircase_buildup}{CHB_staircase_buildup}%
-    {How three individual cell outputs combine to form the seven-level
-     multilevel waveform ($n = 3$). Each of the top three panels shows
-     one cell's unipolar PWM output (solid) together with its triangular
-     carrier (grey) and the sinusoidal reference $MV_{dc}\sin(\omega t)$
-     (dashed). Carriers are phase-shifted by $120^\circ$ relative to each
-     other. The bottom panel is their sum: a seven-level staircase that
-     closely tracks the ideal sinusoid (red dashed), with residual error
-     shown in orange.}{1.0}
+    {How three individual H-bridge cell outputs combine to form a
+     seven-level multilevel waveform ($n = 3$, $f_c = 12f$, $M = 0.95$).
+     \textbf{Rows 1--3:} each cell's unipolar PWM output (solid coloured
+     line) is shown together with its triangular carrier (grey) and the
+     shared sinusoidal reference $MV_{dc}\sin(\omega t)$ (dashed).
+     Carriers are phase-shifted by $120^\circ$ so that the three cells
+     switch at interleaved instants.
+     \textbf{Row 4 (Sum):} the series sum $v_g = v_1 + v_2 + v_3$
+     steps through seven discrete levels
+     ($0,\,\pm V_{dc},\,\pm 2V_{dc},\,\pm 3V_{dc}$) and closely tracks
+     the ideal sinusoid $3V_{dc}M\sin(\omega t)$ (red dashed line).
+     The orange shading is the residual instantaneous error; the
+     phase-shifted carriers ensure that no two cells switch at the same
+     instant, spreading the transitions evenly and minimising the error.}{1.0}
 
 \begin{physbox}[Analogy Re-evaluated: The Torch Batteries]
 The torch analogy says: stack $n$ batteries in series; the total voltage is their
