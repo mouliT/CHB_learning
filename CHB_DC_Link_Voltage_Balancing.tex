@@ -255,26 +255,6 @@ smaller filter $L_f$ --- see \figref{fig:staircase_buildup}.
      phase-shifted carriers ensure that no two cells switch at the same
      instant, spreading the transitions evenly and minimising the error.}{1.0}
 
-\begin{physbox}[Analogy Re-evaluated: The Torch Batteries]
-The torch analogy says: stack $n$ batteries in series; the total voltage is their
-sum; if one battery sags, the total drops. That part holds ---
-\emph{voltage summation and the consequence of imbalance are captured correctly.}
-
-\medskip
-But the analogy misleads on one important point. In a torch the batteries are
-stacked on their \textbf{DC terminals}: the positive pole of battery~1 presses
-against the negative pole of battery~2. In the CHB, the series connection is
-on the \textbf{AC output side only}. Each cell's DC-link capacitor has its own
-private DC source and shares no DC rail with any other cell. The DC sides are
-as electrically separate as the power sockets in different rooms.
-
-\medskip
-A more precise image: $n$ independent AC generators, each driven by its own
-private fuel tank (the isolated DC source), with their AC output terminals
-daisy-chained in series to drive a common load (the grid). The fuel tanks
-do not share pipes. Only the AC outputs are in series.
-\end{physbox}
-
 \subsection{The Problem in One Sentence}
 
 \textbf{Every cell shares the same AC current $\ig$, but each cell has its own
