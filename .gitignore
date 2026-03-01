@@ -10,3 +10,12 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+# Reference PDFs (large, not needed in repo)
+*.pdf
+
+# Claude Code session files
+.claude/
+
+# Metrics / scratch JSON
+figures/*.json

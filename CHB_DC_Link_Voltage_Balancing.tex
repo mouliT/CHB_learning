@@ -3,7 +3,7 @@
 %  Paper 3 Reference Notes
 %  Source: [Vasishta et al.], IEEE Access
 %  Figures stored in: figures/
-%  Naming convention: P3_Fig[N]_page[XX].png  (caption-extracted at 200 DPI)
+%  Naming convention: DLVBMCHBC_Fig[N]_page[XX].png  (caption-extracted at 200 DPI)
 % ============================================================
 \documentclass[12pt, a4paper]{article}
 
@@ -136,6 +136,161 @@
 \clearpage
 
 % ============================================================
+\setcounter{section}{-1}
+\section{Before You Begin --- The Big Picture}
+\label{sec:bigpicture}
+% ============================================================
+
+\subsection{What Is This Document?}
+
+This document is a self-contained reference guide to the paper:
+
+\begin{center}
+\textit{``DC-Link Voltage Balancing Modulation for Cascaded H-Bridge Converters''}\\
+Y.\,Ko, A.\,Tcai, and M.\,Liserre, \textit{IEEE Access}, 2021.
+\end{center}
+
+It walks through every figure, every equation, and every design decision in
+Feynman style --- starting from the simplest possible picture and building up
+to the full algorithm. No derivation is skipped; no equation is left unexplained.
+
+\textbf{What you will understand by the end:}
+\begin{itemize}
+    \item Why a Cascaded H-Bridge (CHB) inverter needs DC-link voltage balancing.
+    \item What ``loading power'' is and why it is the right quantity to control.
+    \item Why clamped modulation is faster than conventional PI control for balancing.
+    \item How to compute the exact modulation parameters to balance any imbalance
+          in minimum time.
+\end{itemize}
+
+\subsection{The Simplest Possible Description of a CHB}
+
+Start with a \textbf{single H-bridge}. It has four transistors arranged in a
+bridge, a DC-link capacitor on one side, and an AC output on the other.
+By switching the transistors at the right times, it converts DC to AC ---
+a very fast ``polarity reversing switch'': at one instant the capacitor's
+positive terminal connects to the AC output; at the next instant the negative
+terminal does.
+
+\medskip
+\textbf{Now cascade $n$ of them in series.} Connect the AC outputs end-to-end,
+like batteries stacked in a torch. Each cell produces $v_i(t)$ and the total
+output is simply their sum:
+\[
+    v_{\mathrm{out}}(t) = v_1(t) + v_2(t) + \cdots + v_n(t)
+\]
+
+\textbf{Why bother stacking?} Each cell's capacitor only needs to hold a
+fraction of the total bus voltage. A 540\,V AC bus can be built from three
+cells with 180\,V capacitors, using cheap low-voltage transistors.
+Modularity, fault tolerance, and near-sinusoidal output come for free.
+
+\begin{physbox}[Analogy: The Multi-Battery Torch]
+Imagine a torch with $n$ batteries in series. Each battery is one H-bridge cell.
+The total voltage is $n \times V_{\rm battery}$. If all batteries are identical
+and fully charged, the torch glows at full brightness. Now suppose battery~1 has
+been partly discharged --- its voltage sags. The total output drops and the light
+dims unevenly.
+
+\medskip
+DC-link balancing is the act of \emph{keeping all batteries at the same voltage
+despite each one being charged by a different source at a different rate.}
+\end{physbox}
+
+\subsection{The Problem in One Sentence}
+
+\textbf{Every cell shares the same AC current $\ig$, but each cell has its own
+DC source delivering a different amount of power.}
+
+If those source powers are unequal and nothing corrects it, the DC voltages
+$\Vdci{i}$ drift apart. The cell with more input power charges up; the cell
+with less power drains down. Left uncorrected, one cell charges to destruction
+while another discharges to zero.
+
+\medskip
+This is the \emph{normal operating condition} for a CHB connected to:
+\begin{itemize}
+    \item \textbf{Photovoltaic strings}: different panels see different shading.
+    \item \textbf{Battery packs}: cells age at different rates and reach different
+          states of charge.
+    \item \textbf{Power routing systems}: cells deliberately assigned unequal power
+          to extend component lifetime.
+\end{itemize}
+
+Balancing is not an optional add-on --- it is a hard requirement for safe, stable
+operation.
+
+\subsection{What This Paper Proposes --- In One Paragraph}
+
+The conventional fix is a per-cell PI controller that nudges each cell's
+modulation index by a small $\Delta M_i$ each cycle. It works, but the measured
+settling time is $\approx 1850$\,ms (92 grid cycles at 50\,Hz). The PI can
+only make a small correction per cycle, otherwise it distorts the grid current.
+
+\medskip
+This paper asks a different question: \emph{what is the maximum loading power
+this cell can absorb or deliver, given its modulation strategy?} It then
+\textbf{directly sets} the modulation parameters $M_i$ and clamping angle
+$\phic$ to deliver exactly that maximum loading power from cycle one.
+The result: $\approx 140$\,ms settling time --- a factor of $13\times$ faster.
+
+\begin{eqnbox}[The One Number That Matters]
+\[
+    \boxed{13\times \text{ faster:} \quad 1850\,\text{ms}
+           \;\longrightarrow\; 140\,\text{ms}}
+\]
+Both methods reach the same steady-state result --- balanced DC-link voltages
+and sinusoidal grid current. The only difference is \emph{how fast they get
+there}.
+\end{eqnbox}
+
+\subsection{Prerequisites}
+
+This document assumes you are comfortable with:
+\begin{enumerate}
+    \item \textbf{Basic switching converters}: duty cycle, average voltage, PWM.
+          If you understand what a buck converter does, you are ready.
+    \item \textbf{AC circuit analysis}: phasors, power factor, the formula
+          $P = V I \cos\theta$.
+    \item \textbf{PI controllers}: a proportional-integral controller integrates
+          the error and adjusts its output. That is all.
+\end{enumerate}
+
+You do \emph{not} need: advanced state-space control theory, transistor-level
+circuit simulation, or prior knowledge of CHB converters.
+
+\subsection{Quick Symbol Reference}
+
+Every symbol used in this document is defined here. Return to this table whenever
+an equation introduces unfamiliar notation.
+
+\begin{statebox}[Master Symbol Table]
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{0.17\linewidth} p{0.40\linewidth} p{0.35\linewidth}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Typical Value / Units} \\
+\midrule
+$n$                    & Number of H-bridge cells            & 3 (prototype), 4 (analysis) \\
+$\Vdci{i}$            & DC-link voltage, cell $i$           & 180\,V (target each) \\
+$\Vtot$                & Total DC voltage $\sum_i \Vdci{i}$ & $n \times 180$\,V \\
+$\ig$, $\Ig$          & Grid current (inst.\ / amplitude)   & A; same through all cells \\
+$\omg$                 & Grid angular frequency              & $2\pi \times 50$\,rad/s \\
+$\phig$                & Grid power factor angle             & Fixed by load \\
+$L_f$                  & Grid-side filter inductance         & mH \\
+$\Mi$                  & Modulation index, cell $i$          & $0 \leq M_i \leq 1$ \\
+$\phic$                & Clamping angle                      & $0$ (none) to $\pi/2$ (full) \\
+$\PH$                  & Loading power (net into cap)        & W \\
+$\PHi{i}$             & Loading power, cell $i$             & W \\
+$\PHnc$                & Non-clamped loading power           & fn.\ of $\Mi$ only \\
+$\PHcl$                & Clamped loading power               & fn.\ of $\Mi$ and $\phic$ \\
+$P_{i,\mathrm{src}}$  & DC source power, cell $i$           & W; unequal between cells \\
+\bottomrule
+\end{tabular}
+\end{statebox}
+
+\clearpage
+
+% ============================================================
 \section{How to Use This Document}
 % ============================================================
 
@@ -184,7 +339,7 @@ approximates a sinusoid with low harmonic distortion.
 different roof faces see different irradiance. Without balancing, the DC-link
 voltages $\Vdci{i}$ diverge over time --- some cells over-charge, others under-charge.
 
-\figentry{fig:P3Fig1}{P3_Fig1_page01.png}%
+\figentry{fig:P3Fig1}{DLVBMCHBC_Fig1_page01.png}%
 {Fig.\,1 --- CHB topology: $n$ H-bridge cells in series, each with its own
  isolated DC-link capacitor. The source powers $P_{1H},\,P_{2H},\ldots,P_{nH}$
  are generally unequal. The AC outputs are summed in series and connected
@@ -234,7 +389,7 @@ cell contributes so that every capacitor reaches equilibrium at $\Vdc$.
 \label{sec:control}
 % ============================================================
 
-\figentry{fig:P3Fig2}{P3_Fig2_page02.png}%
+\figentry{fig:P3Fig2}{DLVBMCHBC_Fig2_page02.png}%
 {Fig.\,2 --- Three-loop control architecture: (1) outer $\Vtot$ loop sets
  grid current reference amplitude; (2) inner $\ig$ loop tracks the reference;
  (3) balancing loop assigns per-cell modulation strategy (clamped vs.
@@ -270,7 +425,7 @@ loop ensures redistribution does not distort the grid current.
 \label{sec:conventional}
 % ============================================================
 
-\figentry{fig:P3Fig3}{P3_Fig3_page02.png}%
+\figentry{fig:P3Fig3}{DLVBMCHBC_Fig3_page02.png}%
 {Fig.\,3 --- Conventional PI balancing algorithm. Each cell $i$ has its own
  PI controller that compares $\Vdci{i}$ to the reference and outputs a
  small modulation correction $\Delta M_i$.}{0.85}
@@ -350,7 +505,7 @@ without waiting for a PI to integrate.
 \label{sec:clamped}
 % ============================================================
 
-\figentry{fig:P3Fig7}{P3_Fig7_page04.png}%
+\figentry{fig:P3Fig7}{DLVBMCHBC_Fig7_page04.png}%
 {Fig.\,7 --- Clamped modulation reference signal. The sinusoidal reference
  is held at $\pm 1$ during the clamped intervals (flat-top sections near
  the peaks). The clamping angle $\phic$ controls the fraction of the cycle
@@ -407,7 +562,7 @@ is what the sorting algorithm exploits.
 \label{sec:algorithm}
 % ============================================================
 
-\figentry{fig:P3Fig4}{P3_Fig4_page03.png}%
+\figentry{fig:P3Fig4}{DLVBMCHBC_Fig4_page03.png}%
 {Fig.\,4 --- Proposed sorting algorithm flowchart. Cells are sorted by
  their required loading power correction direction, then assigned clamped
  (discharge) or non-clamped (charge) modulation mode. The modulation
@@ -462,7 +617,7 @@ factor of 13$\times$ faster.
 \label{sec:two_cell}
 % ============================================================
 
-\figentry{fig:P3Fig5}{P3_Fig5_page03.png}%
+\figentry{fig:P3Fig5}{DLVBMCHBC_Fig5_page03.png}%
 {Fig.\,5 --- Two-cell case study showing the feasible clamped and
  non-clamped operating regions in the $(M,\,\phic)$ plane. The algorithm
  selects the operating point that delivers the required loading power
@@ -483,7 +638,7 @@ the total modulation sum remains correct.
 \label{sec:four_cell}
 % ============================================================
 
-\figentry{fig:P3Fig6}{P3_Fig6_page04.png}%
+\figentry{fig:P3Fig6}{DLVBMCHBC_Fig6_page04.png}%
 {Fig.\,6 --- Five distinct cases for four cells, depending on how many cells
  need discharge vs.\ charge. Case I: all non-clamped. Cases II--IV: mixed
  assignments. Case V: all clamped.}{0.75}
@@ -570,7 +725,7 @@ before using these equations in calculations.
 \label{sec:3d_surface}
 % ============================================================
 
-\figentry{fig:P3Fig8}{P3_Fig8_page04.png}%
+\figentry{fig:P3Fig8}{DLVBMCHBC_Fig8_page04.png}%
 {Fig.\,8 --- 3D loading power surfaces as functions of modulation index $M$
  and clamping angle $\phic$. Clamped mode surface (left): $\PHcl(M,\phic)$
  shows the two-variable freedom. Non-clamped mode (right): $\PHnc(M)$ is a
@@ -594,7 +749,7 @@ method is faster than the PI method.
 \label{sec:performance_comparison}
 % ============================================================
 
-\figentry{fig:P3Fig9}{P3_Fig9_page04.png}%
+\figentry{fig:P3Fig9}{DLVBMCHBC_Fig9_page04.png}%
 {Fig.\,9 --- Maximum achievable loading power $|\PH|_{\max}$ vs.\ modulation
  index $M$, comparing proposed sorting algorithm (solid) to conventional
  PI method (dashed). The proposed method achieves higher maximum loading
@@ -620,7 +775,7 @@ $|\PH|_{\max}^{\mathrm{proposed}} / |\PH|_{\max}^{\mathrm{conv}}$.
 \label{sec:simulation}
 % ============================================================
 
-\figentry{fig:P3Fig10}{P3_Fig10_page05.png}%
+\figentry{fig:P3Fig10}{DLVBMCHBC_Fig10_page05.png}%
 {Fig.\,10 --- Simulation comparison (6-panel, $2\times3$ grid). Left column:
  conventional PI balancing. Right column: proposed sorting algorithm.
  Row 1: DC-link voltages $\Vdci{i}$. Row 2: loading powers $\PHi{i}$.
@@ -642,7 +797,7 @@ at $t=0$ (full correction), then returns to steady-state values.
 Conventional: only small incremental changes per cycle.
 \end{physbox}
 
-\figentry{fig:P3Fig11}{P3_Fig11_page06.png}%
+\figentry{fig:P3Fig11}{DLVBMCHBC_Fig11_page06.png}%
 {Fig.\,11 --- Maximum balancing performance comparison between conventional
  and proposed methods under the most demanding imbalance conditions.}{0.85}
 
@@ -652,20 +807,20 @@ Conventional: only small incremental changes per cycle.
 \label{sec:experimental}
 % ============================================================
 
-\figentry{fig:P3Fig12}{P3_Fig12_page06.png}%
+\figentry{fig:P3Fig12}{DLVBMCHBC_Fig12_page06.png}%
 {Fig.\,12 --- Three-cell CHB prototype. Specifications: $n=3$ cells,
  grid 230\,V$_{\rm rms}$ single-phase, DC-link target $\Vdc=180$\,V per cell,
  DC-link capacitance \SI{1100}{\micro\farad} per cell. Control implemented
  on a DSP.}{0.85}
 
-\figentry{fig:P3Fig13}{P3_Fig13_page07.png}%
+\figentry{fig:P3Fig13}{DLVBMCHBC_Fig13_page07.png}%
 {Fig.\,13 --- Steady-state experimental results under three different power
  imbalance conditions. Each condition shows oscilloscope captures of
  DC-link voltages and grid current with cell output voltages. All three
  DC-link voltages are maintained at 180\,V despite unequal source powers;
  the grid current remains sinusoidal.}{0.90}
 
-\figentry{fig:P3Fig14}{P3_Fig14_page08.png}%
+\figentry{fig:P3Fig14}{DLVBMCHBC_Fig14_page08.png}%
 {Fig.\,14 --- Dynamic response comparison. A step power imbalance is applied
  at $t=0$. Left: conventional PI, settling time $\sim$1850\,ms. Right:
  proposed sorting algorithm, settling time $\sim$140\,ms. Factor of
