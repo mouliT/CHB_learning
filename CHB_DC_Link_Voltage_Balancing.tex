@@ -232,7 +232,27 @@ fraction $\Vdci{i}$ of the total bus voltage, so low-voltage, low-cost
 transistors suffice. A 540\,V grid interface is built from three 180\,V cells.
 With sinusoidal PWM and phase-shifted carriers, $n$ cells together produce a
 $(2n{+}1)$-level output; more levels mean lower harmonic distortion and a
-smaller filter $L_f$.
+smaller filter $L_f$ --- see \figref{fig:staircase_summation} and
+\figref{fig:staircase_buildup}.
+
+\figentry{fig:staircase_summation}{CHB_staircase_summation}%
+    {Effect of increasing the number of H-bridge cells on the PWM output
+     waveform. Each panel shows the summed output of $n = 1, 2, 3, 4$ cells
+     using unipolar sinusoidal PWM with phase-shifted carriers
+     ($f_c = 12f$, $M = 0.95$). The orange shading is the instantaneous
+     error between the PWM output and the ideal sinusoid. More cells yield
+     more voltage levels and a smaller error, reducing the harmonic content
+     and the required filter inductance $L_f$.}{1.0}
+
+\figentry{fig:staircase_buildup}{CHB_staircase_buildup}%
+    {How three individual cell outputs combine to form the seven-level
+     multilevel waveform ($n = 3$). Each of the top three panels shows
+     one cell's unipolar PWM output (solid) together with its triangular
+     carrier (grey) and the sinusoidal reference $MV_{dc}\sin(\omega t)$
+     (dashed). Carriers are phase-shifted by $120^\circ$ relative to each
+     other. The bottom panel is their sum: a seven-level staircase that
+     closely tracks the ideal sinusoid (red dashed), with residual error
+     shown in orange.}{1.0}
 
 \begin{physbox}[Analogy Re-evaluated: The Torch Batteries]
 The torch analogy says: stack $n$ batteries in series; the total voltage is their
