@@ -165,36 +165,64 @@ to the full algorithm. No derivation is skipped; no equation is left unexplained
 
 \subsection{The Simplest Possible Description of a CHB}
 
-Start with a \textbf{single H-bridge}. It has four transistors arranged in a
-bridge, a DC-link capacitor on one side, and an AC output on the other.
-By switching the transistors at the right times, it converts DC to AC ---
-a very fast ``polarity reversing switch'': at one instant the capacitor's
-positive terminal connects to the AC output; at the next instant the negative
-terminal does.
+\textbf{Start with a single H-bridge cell.} It has two ports:
+
+\begin{itemize}
+    \item \textbf{DC input port:} an isolated DC-link capacitor at voltage
+          $\Vdci{i}$, continuously replenished by a DC source (a PV string,
+          a battery pack, or a rectifier) delivering power $P_{iH}$.
+          This port does not connect electrically to any other cell.
+    \item \textbf{AC output port:} two terminals that the four transistors
+          switch at high frequency. The average voltage across these terminals
+          over one switching period is $v_i(t) = \Vdci{i} \cdot \Mi\sin(\omg t)$,
+          where $\Mi$ is the modulation index the controller sets.
+\end{itemize}
+
+The H-bridge is therefore a controlled DC-to-AC converter: power flows in
+from an isolated DC source and flows out as a shaped AC voltage.
 
 \medskip
-\textbf{Now cascade $n$ of them in series.} Connect the AC outputs end-to-end,
-like batteries stacked in a torch. Each cell produces $v_i(t)$ and the total
-output is simply their sum:
+\textbf{Where exactly does cascading happen?}
+In this paper, $n$ such cells are cascaded by connecting their \emph{AC output
+terminals} in series --- the top terminal of cell~$i$ joins the bottom terminal
+of cell~$(i{+}1)$, forming a single series string. The bottom terminal of the
+lowest cell and the top terminal of the highest cell are the two ends of this
+string. One end connects to the grid through filter inductance $L_f$; the other
+end is the neutral. The same grid current $\ig$ is forced through every cell
+in the string. The DC input ports play no part in the cascading --- they remain
+fully isolated from one another throughout.
+
+\medskip
+The total AC voltage presented to the grid is the series sum of all cell outputs:
 \[
-    v_{\mathrm{out}}(t) = v_1(t) + v_2(t) + \cdots + v_n(t)
+    \vg(t) = v_1(t) + v_2(t) + \cdots + v_n(t)
+    = \ig \sum_{i=1}^{n} \Vdci{i}\Mi\sin(\omg t + \theta_i)
 \]
 
-\textbf{Why bother stacking?} Each cell's capacitor only needs to hold a
-fraction of the total bus voltage. A 540\,V AC bus can be built from three
-cells with 180\,V capacitors, using cheap low-voltage transistors.
-Modularity, fault tolerance, and near-sinusoidal output come for free.
+\textbf{Why bother stacking?} Each cell's capacitor only needs to support a
+fraction $\Vdci{i}$ of the total bus voltage, so low-voltage, low-cost
+transistors suffice. A 540\,V grid interface is built from three 180\,V cells.
+Staircase summation of cell voltages also approximates a sinusoid naturally,
+reducing output harmonics without a bulky filter.
 
-\begin{physbox}[Analogy: The Multi-Battery Torch]
-Imagine a torch with $n$ batteries in series. Each battery is one H-bridge cell.
-The total voltage is $n \times V_{\rm battery}$. If all batteries are identical
-and fully charged, the torch glows at full brightness. Now suppose battery~1 has
-been partly discharged --- its voltage sags. The total output drops and the light
-dims unevenly.
+\begin{physbox}[Analogy Re-evaluated: The Torch Batteries]
+The torch analogy says: stack $n$ batteries in series; the total voltage is their
+sum; if one battery sags, the total drops. That part holds ---
+\emph{voltage summation and the consequence of imbalance are captured correctly.}
 
 \medskip
-DC-link balancing is the act of \emph{keeping all batteries at the same voltage
-despite each one being charged by a different source at a different rate.}
+But the analogy misleads on one important point. In a torch the batteries are
+stacked on their \textbf{DC terminals}: the positive pole of battery~1 presses
+against the negative pole of battery~2. In the CHB, the series connection is
+on the \textbf{AC output side only}. Each cell's DC-link capacitor has its own
+private DC source and shares no DC rail with any other cell. The DC sides are
+as electrically separate as the power sockets in different rooms.
+
+\medskip
+A more precise image: $n$ independent AC generators, each driven by its own
+private fuel tank (the isolated DC source), with their AC output terminals
+daisy-chained in series to drive a common load (the grid). The fuel tanks
+do not share pipes. Only the AC outputs are in series.
 \end{physbox}
 
 \subsection{The Problem in One Sentence}
