@@ -1,17 +1,17 @@
 """
 CHB multilevel PWM summation figure — n = 1, 2, 3, 4 cells
-Unipolar sinusoidal PWM, phase-shifted carriers (360/n degrees apart), fc = 12f
-No THD label — visual error region (orange) tells the story unambiguously.
+Unipolar sinusoidal PWM, phase-shifted carriers (360/n degrees apart), fc = 6f
+fc = 6f chosen so each PWM block is wide enough to read the error height clearly.
 """
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-FC_RATIO = 12
+FC_RATIO = 6
 M        = 0.95
 Vdc      = 1.0
-N        = 14400   # 1200 pts per carrier cycle
+N        = 7200    # 1200 pts per carrier cycle
 
 theta = np.linspace(0, 2 * np.pi, N, endpoint=False)
 t     = theta / (2 * np.pi)
@@ -81,7 +81,7 @@ axes[-1].set_xticklabels(
 
 fig.suptitle(
     'CHB Multilevel PWM Output: Effect of Number of Cells\n'
-    r'Unipolar sinusoidal PWM, phase-shifted carriers ($f_c = 12f$, $M = 0.95$)'
+    r'Unipolar sinusoidal PWM, phase-shifted carriers ($f_c = 6f$, $M = 0.95$)'
     '\nMore cells \u2192 more voltage levels \u2192 smaller error (orange) \u2192 smaller $L_f$ needed',
     fontsize=11.5, fontweight='bold')
 
