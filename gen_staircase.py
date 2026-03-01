@@ -23,7 +23,8 @@ def triangular(t_norm, fc_ratio, phase_deg):
 def unipolar_pwm(t_norm, fc_ratio, carrier_phase_deg, M, Vdc):
     ref     = M * np.sin(2 * np.pi * t_norm)
     carrier = triangular(t_norm, fc_ratio, carrier_phase_deg)
-    return np.where(ref > carrier, Vdc, np.where(ref < -carrier, -Vdc, 0.0))
+    ac = np.abs(carrier)
+    return np.where(ref > ac, Vdc, np.where(ref < -ac, -Vdc, 0.0))
 
 n_list = [1, 2, 3, 4]
 
