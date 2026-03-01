@@ -38,25 +38,33 @@ for ax, n in zip(axes, n_list):
     v_total = sum(v_cells)
     ideal   = n * Vdc * M * np.sin(2 * np.pi * t)
 
-    ax.fill_between(theta, v_total, ideal,
+    # Normalise by n*Vdc so every panel has the same y-scale.
+    # The ideal sinusoid now has amplitude M=0.95 in every panel;
+    # each voltage step equals 1/n of the full scale, shrinking visibly with n.
+    scale   = n * Vdc
+    v_n     = v_total / scale
+    ideal_n = ideal   / scale   # = M * sin(2π t) — same shape for all n
+
+    ax.fill_between(theta, v_n, ideal_n,
                     alpha=0.22, color='#f4a582', zorder=2,
                     label='Error vs ideal sinusoid')
-    ax.plot(theta, v_total, color='#2166ac', lw=0.85,
+    ax.plot(theta, v_n, color='#2166ac', lw=0.85,
             label=f'{2*n+1}-level PWM output ($n={n}$)', zorder=3)
-    ax.plot(theta, ideal, color='#d73027', lw=2.0, ls='--',
+    ax.plot(theta, ideal_n, color='#d73027', lw=2.0, ls='--',
             label='Ideal sinusoid (fundamental)', zorder=4)
 
     for k in range(-n, n + 1):
-        ax.axhline(k * Vdc, color='gray', lw=0.4, ls=':', alpha=0.4)
+        ax.axhline(k / n, color='gray', lw=0.4, ls=':', alpha=0.4)
         lbl = f'${k:+d}V_{{dc}}$' if k != 0 else '$0$'
-        ax.text(2 * np.pi + 0.07, k * Vdc, lbl,
+        ax.text(2 * np.pi + 0.07, k / n, lbl,
                 va='center', ha='left', fontsize=7.5,
                 color='#2166ac', clip_on=False)
 
     ax.set_xlim(0, 2 * np.pi)
-    ax.set_ylim(-n * 1.35, n * 1.50)
-    ax.set_yticks([])
-    ax.set_ylabel('Voltage', fontsize=10)
+    ax.set_ylim(-1.30, 1.45)          # same for every panel
+    ax.set_yticks([-1, 0, 1])
+    ax.set_yticklabels([f'$-{n}V_{{dc}}$', '$0$', f'$+{n}V_{{dc}}$'], fontsize=9)
+    ax.set_ylabel('Norm. voltage', fontsize=10)
     ns = 'cell' if n == 1 else 'cells'
     ax.set_title(
         f'  $n = {n}$ {ns}  \u2192  $2n+1 = {2*n+1}$ voltage levels'
