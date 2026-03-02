@@ -748,22 +748,56 @@ power than a sinusoid at the \emph{same} peak amplitude $M$.
 \medskip
 \textbf{Step 3 --- Why not simply command a square wave?}
 
-A square wave has large odd harmonics ($b_n = 4/n\pi$).  These harmonic
-voltages drive harmonic currents through $L_f$, injecting THD into the
-grid --- which is limited by grid codes.  The paper therefore needs a
-\emph{continuously tuneable family} of waveforms that:
-\begin{itemize}
-  \item at one extreme equals the sinusoid ($b_1 = 1$, zero extra THD);
-  \item at the other extreme approaches the square wave ($b_1 = 4/\pi$,
-        maximum extra power);
-  \item can be tuned smoothly between the two extremes via a single
-        parameter $\phic$.
-\end{itemize}
-\textbf{Clamped modulation is exactly that family.}  By freezing $v_i$
-at $\pm M\Vdc\sin\phic$ near the zero crossings (instead of letting it
-descend to zero), the waveform is \emph{lifted} toward the square wave
-in a controlled way.  $\phic = 0$ gives the sinusoid;
-$\phic = \pi/2$ gives the square wave.
+A natural objection: in a CHB the KVL is
+$\vg = \sum_i v_i$, so one can always write
+\[
+  \vg \;=\; \underbrace{v_1}_{\text{square}} \;+\;
+            \underbrace{(\vg - v_1)}_{\text{remaining cells}}
+\]
+If the current controller keeps $\vg = \sum_i v_i$ sinusoidal (its job),
+and one cell outputs a square wave, then the \emph{remaining cells
+collectively} automatically output $\vg - \text{square}$ --- a signal
+whose harmonics cancel the square wave's harmonics.  The sum is still
+sinusoidal, so $\ig$ is still sinusoidal.  \textbf{The THD argument
+against a square wave does not hold in a CHB.}
+
+Two real constraints rule out a pure square wave in practice:
+
+\begin{enumerate}
+  \item \textbf{Modulation headroom.}
+        The compensating cells must output
+        $v_{\text{comp}} = \vg - v_{\text{square}}$.
+        Expanding: $\vg = V_{\text{ref}}\sin\theta$,
+        $v_{\text{square}} = \frac{4M\Vdc}{\pi}\sin\theta
+        + \frac{4M\Vdc}{3\pi}\sin 3\theta + \cdots$
+        So the compensating signal has:
+        \begin{itemize}
+          \item a \emph{reduced} fundamental
+                $(V_{\text{ref}} - 4M\Vdc/\pi)\sin\theta$ --- possibly
+                smaller (or even sign-reversed) compared to a normal cell;
+          \item harmonic terms at $3\omg, 5\omg, \ldots$ that must be
+                synthesised by cells whose output is bounded by $\pm\Vdci{}$.
+        \end{itemize}
+        At high modulation depths ($M \to 1$) the cells have no headroom
+        left to generate these harmonic components --- the compensation
+        becomes physically impossible before it is complete.
+
+  \item \textbf{Granularity of correction.}
+        A square wave fixes the loading power increment at
+        $\Delta P = (4/\pi - 1)\PHnc \approx 0.27\,\PHnc$ --- a large,
+        discrete jump.  Balancing requires \emph{precisely} the right
+        correction for each cell at each cycle; a binary choice
+        (sinusoid or square wave) overshoots for small imbalances and
+        cannot be finely adjusted as $V_{dc,i}$ converges toward its target.
+\end{enumerate}
+
+\textbf{Clamped modulation solves both problems.}
+By freezing $v_i$ at $\pm M\Vdc\sin\phic$ near the zero crossings,
+the waveform is lifted smoothly toward the square wave.
+$\phic = 0$ gives the sinusoid (zero extra power);
+$\phic = \pi/2$ gives the square wave (maximum extra power);
+any $\phic$ in between gives a \emph{continuously tuneable} correction
+that can be matched exactly to the imbalance of each cell at each cycle.
 \end{physbox}
 
 % ·· Mode 1 recap ··························································
