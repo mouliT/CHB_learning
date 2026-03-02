@@ -699,23 +699,45 @@ quantitatively.  The question is: can we give the balancing algorithm
 \label{subsec:clamped_mode}
 
 % ·· Level-1 intuition ·····················································
-\begin{physbox}[Start here: the bucket-and-hose analogy]
-Imagine trying to fill a bucket with a hose whose flow rate varies as a
-sine wave.  During the positive half of the cycle, water flows in; during
-the negative half, it is sucked back out.  Over a full cycle the net
-water is exactly zero --- the bucket is perfectly balanced.
+\begin{physbox}[Start here: what happens to $v_i \cdot \ig$ near a zero crossing?]
+Loading power is the area under the curve $p(\theta) = v_i(\theta)\cdot\ig(\theta)$.
+Ask yourself: \emph{how much area does the region near a zero crossing contribute?}
 
-Now suppose instead of letting the flow rate glide all the way to zero at
-the zero-crossing, you \emph{freeze} it at a small positive trickle for a
-short window either side of the crossing.  Even that tiny trickle, held
-for the duration of the window, adds net water.  The wider the window
-(larger $\phic$), the more extra water you accumulate.
+\textbf{Non-clamped case.}
+At unity power factor both $v_i$ and $\ig$ are sinusoids at the same
+frequency, so they reach zero \emph{at the same moment}.
+Near the crossing at $\theta = 0$:
+\[
+  v_{nc} \approx M\Vdc\cdot\theta, \qquad
+  \ig    \approx \Ig\cdot\theta
+  \qquad\Longrightarrow\qquad
+  p(\theta) = v_{nc}\cdot\ig \approx M\Vdc\Ig\,\theta^{2}
+\]
+The power near the crossing goes as $\theta^2$ --- a \emph{parabola} that
+pinches tightly to zero.  The area of a thin strip of width $\phic$ under a
+parabola is $\propto \phic^{3}/3$, which is extremely small for small $\phic$.
 
-This is precisely what clamped modulation does.  The ``hose'' is the
-cell's output voltage $v_i(t)$; the ``water'' is energy flowing into the
-DC capacitor (or back to the source).  By \emph{not} letting $v_i$ cross
-zero smoothly, the cell absorbs more energy per cycle --- without ever
-changing its peak amplitude $M$.
+\textbf{Clamped case.}
+Now $v_c^{*}$ is frozen at $M\Vdc\sin\phic$ while $\ig$ is still a sinusoid:
+\[
+  v_c^{*} = M\Vdc\sin\phic \;(\text{constant}), \qquad
+  \ig \approx \Ig\cdot\theta
+  \qquad\Longrightarrow\qquad
+  p(\theta) = M\Vdc\Ig\,\sin\phic\cdot\theta
+\]
+Now the power near the crossing goes as $\theta$ --- a \emph{straight line},
+not a parabola.  The area under a straight line of width $\phic$ is
+$\propto \phic^{2}/2$, which is \emph{much larger} than $\phic^{3}/3$ for
+small $\phic$.
+
+\textbf{The key insight:}
+Non-clamped suffers from a \emph{double penalty} --- both $v$ and $i$ go
+to zero together, so their product goes to zero as $\theta^2$.
+Clamping breaks this: $v$ stays nonzero, so the product goes to zero only
+as $\theta^1$.  The near-crossing region contributes real area to the
+loading power integral instead of contributing almost nothing.
+Wider $\phic$ means a larger near-crossing window converts from
+``parabolic-zero'' to ``linear'', so more total area is gained.
 \end{physbox}
 
 % ·· Mode 1 recap ··························································
