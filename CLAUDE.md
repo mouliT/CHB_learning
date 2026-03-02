@@ -32,8 +32,18 @@
 4. **Torch battery analogy:** removed by user — do not re-introduce it.
 
 ## Document Progress
-| Section | Status |
-|---|---|
-| §0 Before You Begin | ✅ Complete |
-| §1 The Circuit | ✅ Complete |
-| §2+ | ⏳ Not started |
+| Section | Status | Notes |
+|---|---|---|
+| §0 Before You Begin | ✅ Complete | All 6 subsections, buildup figure embedded |
+| §1 The Circuit | ✅ Complete | Paper Fig.1, component walk-through, loading power with governing equations |
+| §2+ | ⏳ Not started | Awaiting green signal on §1 |
+
+## §1 Key Equations (for continuity)
+- Capacitor energy balance: `C·Vdc,i·dVdc,i/dt = P_i,src - P_H,i`
+- Steady-state condition per cycle k: `P_H,i(k) = P_i,src(k)`
+- Non-clamped loading power (derived in §2): `P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g)`
+- "Continuously corrects" means re-solving Mi(k) every grid cycle because P_i,src(k) changes
+
+## Next Section Plan (§2)
+Cover: how P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g) is derived (integral of v_i·i_g over one period),
+and introduce the control scheme (paper Fig. 2 — typical control architecture).

@@ -458,14 +458,32 @@ it is the \emph{only} quantity the modulator can manipulate to
 keep $\Vdci{i}$ at its target value.
 \end{physbox}
 
-\begin{warningbox}[The Key Asymmetry]
+\begin{warningbox}[The Key Asymmetry --- and What ``Continuously Corrects'' Means]
 The grid current $\ig$ is \emph{shared} --- it is the same for every
 cell. The DC source powers $P_{i,\mathrm{src}}$ are \emph{independent}
 --- they depend on sunlight, battery state of charge, or deliberate
-power routing and can differ arbitrarily between cells.
-Consequently $\PHi{i}$ can be different for every cell, and the
-DC-link voltages $\Vdci{i}$ will drift unless the controller
-continuously corrects them. This is the problem the paper solves.
+power routing, and can differ arbitrarily between cells and change
+from one grid cycle to the next.
+
+\medskip
+From the capacitor equation derived above, the steady-state condition
+for cell $i$ at grid cycle $k$ is:
+\[
+    \PHi{i}(k) \stackrel{!}{=} P_{i,\mathrm{src}}(k)
+\]
+Substituting the non-clamped loading power expression
+(derived in Section~2):
+\[
+    \underbrace{\tfrac{1}{2}\,\Vdci{i}(k)\,\Mi(k)\,\Ig\cos\phig}_{P_{H,i}(k)}
+    \;=\; P_{i,\mathrm{src}}(k)
+\]
+The controller must solve this for $\Mi(k)$ \emph{every grid cycle}
+because $P_{i,\mathrm{src}}(k)$ changes continuously (cloud passing
+over a PV panel, battery charging/discharging). That is what
+``continuously corrects'' means: re-computing and re-applying $\Mi$
+at each cycle $k$ to keep the left-hand side tracking the
+right-hand side despite a moving target. This is the problem the
+paper solves --- and does so $13\times$ faster than a PI controller.
 \end{warningbox}
 
 \clearpage
