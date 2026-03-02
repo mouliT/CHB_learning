@@ -602,35 +602,100 @@ The paper exploits this closed form to achieve one-cycle balancing.
      modulation index $\Mi$ to keep all DC-link voltages equal at
      their target $\Vdci{} = \Vtot/n$.}{0.90}
 
-\figref{fig:paper_fig2} shows the two-layer control structure used
-throughout the paper.
+\figref{fig:paper_fig2} shows the two-layer (plus balancing) control
+structure used throughout the paper.
 
 \begin{circuitbox}[Two-Layer Control --- What Each Layer Does]
 \begin{enumerate}
-    \item \textbf{Outer loop --- DC-link voltage control.}
-          This slower loop monitors the DC-link voltages $\Vdci{i}$
-          (or their sum $\Vtot$) and compares them to the desired
-          target.  Its output is the grid-current reference amplitude
-          $\Ig^{*}$, which tells the inner loop how much current
-          to draw from the grid.
+    \item \textbf{Outer loop --- DC-link voltage control (slow).}
+          Monitors the total DC-link voltage $\sum_i\Vdci{i}$ and
+          drives it to the target $\sum V_{dc,nH}^{*}$.
+          Output: grid-current amplitude reference $\Ig^{*}$.
 
-    \item \textbf{Inner loop --- grid current control.}
-          This faster loop (PR or PI controller) compares the measured
-          grid current $\ig$ to the reference $\ig^{*}$ from the outer
-          loop and outputs a common voltage reference
-          $v_{\mathrm{ref}}(t) = V_{\mathrm{ref}}\sin(\omg t)$
-          shared by all $n$ cells.
-          Its job: keep $\ig$ sinusoidal and tracking $\ig^{*}$.
+    \item \textbf{Inner loop --- grid current control (fast).}
+          Tracks $\ig^{*}$ by adjusting the total AC string voltage.
+          Output: common voltage reference $v^{*}$.
+          Must be faster than the outer loop ($t_c \ll t_v$).
 
-    \item \textbf{Balancing algorithm.}
-          Running alongside the two feedback loops, the balancing
-          algorithm computes an individual $\Mi$ for each cell so
-          that $\PHi{i}$ tracks $P_{i,\mathrm{src}}$.
-          The \emph{sum} $\sum_i \Vdci{i}\Mi$ is constrained to equal
-          $V_{\mathrm{ref}}$, so the inner loop's modulation target
-          is respected even while individual $\Mi$ values differ.
+    \item \textbf{Balancing algorithm (every grid cycle).}
+          Distributes $v^{*}$ into per-cell references
+          $v_{1H}^{*}, \ldots, v_{nH}^{*}$ so that each
+          $\PHi{i}$ tracks $P_{i,\mathrm{src}}$,
+          subject to $\sum_i v_{iH}^{*} = v^{*}$ at all times.
 \end{enumerate}
 \end{circuitbox}
+
+\begin{physbox}[Signal-by-Signal Tour of Fig.\,2]
+
+\textbf{Outer loop signals.}
+\begin{itemize}
+  \item $\sum V_{dc,nH}^{*}$ (\emph{reference}).
+        Total DC-link voltage setpoint $= n \times V_{dc,H}^{*}$.
+        Set by the system designer --- must exceed the peak grid
+        voltage plus the inductor drop margin.  Fixed in firmware.
+  \item $\sum V_{dc,nH}$ (\emph{measurement}).
+        Sum of all $n$ cell voltages: $V_{dc,1H} + \cdots + V_{dc,nH}$.
+        Each cell has an isolated voltage sensor on its DC-link
+        capacitor; the controller adds the $n$ readings.
+  \item $\ig^{*}$ (\emph{computed reference}).
+        Grid-current \emph{amplitude} produced by the ΣV\textsubscript{DC}
+        PI controller.
+        Intuition: if the total DC voltage rises above target the
+        sources are over-delivering, so export more current (raise
+        $\Ig^{*}$); if it falls, export less (lower $\Ig^{*}$).
+        The actual time-domain reference fed to the inner loop is
+        $\ig^{*}(t) = \Ig^{*}\sin(\omg t - \phig)$;
+        the phase comes from a PLL on $\vg$ (not drawn in Fig.\,2).
+  \item $t_v$: outer-loop PI time constant.
+        Chosen \emph{slow} so the outer loop does not interfere with
+        the faster inner loop.
+\end{itemize}
+
+\textbf{Inner loop signals.}
+\begin{itemize}
+  \item $\ig^{*}$ (\emph{reference}, from outer loop).
+        Instantaneous current reference $= \Ig^{*}\sin(\omg t - \phig)$.
+  \item $\ig$ (\emph{measurement}).
+        Actual grid current measured by a single current sensor
+        (Hall-effect or similar) at the filter inductor $L_f$.
+        Because all $n$ cells are in series, \emph{one sensor captures
+        the current of every cell simultaneously}.
+  \item $v^{*}$ (\emph{computed reference}).
+        Total AC string voltage needed to drive $\ig \to \ig^{*}$,
+        produced by the current controller (typically a PR controller
+        in the stationary frame or a PI in the rotating dq frame).
+        This is a single scalar reference for the \emph{sum} of all
+        cell outputs; it is the balancing block's input.
+  \item $t_c$: inner-loop time constant ($t_c \ll t_v$).
+\end{itemize}
+
+\textbf{Balancing control signals.}
+\begin{itemize}
+  \item $V_{dc,H}^{*}$ (\emph{reference}, top arrow).
+        Common per-cell DC target $= \sum V_{dc,nH}^{*} / n$.
+        Pure arithmetic --- each cell aims for the same voltage.
+  \item $V_{dc,1H},\ldots,V_{dc,nH}$ (\emph{measurements}, bottom arrows).
+        Individual cell voltages from the same isolated sensors used
+        by the outer loop.  The balancing algorithm compares each
+        $\Vdci{i}$ to $V_{dc,H}^{*}$ to decide which cells need
+        more loading power and which need less.
+  \item $v^{*}$ (\emph{reference}, from inner loop).
+        The total that the per-cell references must sum to at every
+        instant.  This constraint is non-negotiable: violating it
+        would break the current loop.
+  \item $t_{bal}$ (\emph{update interval}).
+        The balancing algorithm re-runs once per grid cycle
+        ($t_{bal} = T = 1/f = 20\,\text{ms}$ at 50\,Hz).
+  \item $v_{1H}^{*},\ldots,v_{nH}^{*}$ (\emph{outputs}).
+        Individual per-cell modulation references.  The sorting
+        algorithm assigns each cell either clamped or non-clamped
+        mode based on whether $\Vdci{i} > V_{dc,H}^{*}$ or not,
+        choosing the assignment that drives every capacitor voltage
+        toward $V_{dc,H}^{*}$ within the constraint
+        $\sum_i v_{iH}^{*} = v^{*}$.
+\end{itemize}
+
+\end{physbox}
 
 \begin{statebox}[The Constraint the Balancing Algorithm Must Obey]
 The inner current loop demands a total output voltage:
