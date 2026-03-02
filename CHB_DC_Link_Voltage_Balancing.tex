@@ -581,15 +581,11 @@ The important point is that only the \textbf{fundamental component} of the cell
 voltage contributes to the cycle-average power exchange; higher harmonics average
 to zero over a full period.
 
-\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
-    {Clamped modulation signal with varied clamping angle $\phic$
-     (paper Fig.\,7).
-     Increasing $\phic$ widens the clamped interval, pushing the waveform closer
-     to a square wave and increasing its fundamental component.}{0.85}
-
 To quantify this, the paper introduces a \textbf{clamping angle} $\phic$ and varies
-it from $0$ to $\pi$ (0 to 180 degrees), as shown in paper Fig.\,7.
-Note that this is the paper's angle convention for this section.
+it from $0$ to $\pi$ (0 to 180 degrees) (paper Fig.\,7).
+In this tutorial we will place and walk through paper Fig.\,7 and paper Fig.\,8 in
+Section~\ref{sec:algorithm} so the figures appear in the same sequence as the
+paper's narrative.
 
 The paper computes the fundamental magnitude using Fourier series.
 For a periodic signal $f(\theta)$, the fundamental coefficients are:
@@ -632,14 +628,6 @@ F_c(\phic) = \frac{1}{\pi}
 F_{nc}(\phic) = 2M - F_c(\phic)
 \]
 \end{eqnbox}
-
-\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
-    {Loading power as a function of the nominal modulation index $M$ and the
-     clamping angle $\phic$ (paper Fig.\,8).
-     The clamped-mode loading power increases with $\phic$; the complementary
-     non-clamped mode decreases accordingly.
-     This widened range of achievable loading powers is what enables faster
-     balancing than PI-based methods.}{0.95}
 
 \begin{statebox}[Numbers to remember from paper Fig.\,8]
 At $M=0.7$ and $\phic=\pi$ (180 degrees), the paper reports approximately
