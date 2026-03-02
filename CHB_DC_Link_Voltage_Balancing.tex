@@ -698,44 +698,91 @@ quantitatively.  The question is: can we give the balancing algorithm
 \subsection{Clamped Modulation --- A New Degree of Freedom}
 \label{subsec:clamped_mode}
 
+Before comparing the two modes, recall what the modulation reference
+physically does.  The H-bridge PWM block compares the reference against
+a triangular carrier.  The \emph{shape} of the reference therefore
+determines the time-averaged output voltage of the cell, and hence how
+much average power the cell transfers to (or absorbs from) the grid.
+Two cells running different reference \emph{shapes} --- while sharing
+the same peak amplitude $M$ --- will deliver different loading powers.
+This is the degree of freedom the paper exploits.
+
+\bigskip
+\noindent\textbf{Mode 1 --- Non-clamped ($v_{nc}^{*}$): standard sinusoid.}
+
+The reference is $v_{nc}^{*}(t) = M\sin(\omg t)$ for the entire cycle
+--- a pure, smooth sinusoid.  The cell output tracks this faithfully
+via PWM.  The loading power formula derived in
+\S\ref{subsec:PH_derivation} applies directly:
+\[
+    \PHnc \;=\; \tfrac{1}{2}\,\Vdc\,M\,\Ig\,\cos\phig
+\]
+Once $M$ and $\Ig$ are set by the current control loop, $\PHnc$ is
+completely determined.  \textbf{There is no remaining knob for the
+balancing algorithm to turn.}
+
+\bigskip
+\noindent\textbf{Mode 2 --- Clamped ($v_{c}^{*}$): flat windows near
+zero crossings.}
+
 \figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
     {Clamped modulation signal with varied clamping angle $\varphi$
-     (paper Fig.\,7).  The solid curve is the clamped reference; the
-     dotted lines show the clamped (flat) portions near the zero
-     crossings.  Increasing $\varphi$ widens the flat region.}{0.62}
+     (paper Fig.\,7).  Away from the zero crossings the reference
+     follows the sinusoid (solid curve).  Within a window of half-width
+     $\varphi$ either side of each zero crossing, the reference is
+     \emph{held flat} at the value it would have at the window boundary
+     (dotted flat segments).  Increasing $\varphi$ widens the flat
+     region, which increases the loading power as shown in
+     \figref{fig:paper_fig8}.}{0.62}
 
-The paper's key insight is to use \emph{two fundamentally different
-waveform shapes} as modulation references instead of one:
+In clamped mode the reference is modified as follows, and
+\figref{fig:paper_fig7} shows exactly what this looks like:
 
-\begin{circuitbox}[Two Modulation Modes]
 \begin{enumerate}
-    \item \textbf{Non-clamped ($v_{nc}^{*}$) --- standard sinusoidal.}
-          The modulation reference is $M\sin(\omg t)$ for the entire
-          cycle.  This is the conventional mode.  Loading power is:
-          \[
-              \PHnc \;=\; \tfrac{1}{2}\,\Vdc\,M\,\Ig\,\cos\phig
-          \]
-          No free parameter beyond $M$ itself.
+    \item \textbf{Away from each zero crossing:} the reference tracks
+          the sinusoid $M\sin(\omg t)$ normally.  The cell switches and
+          approximates the sinusoidal waveform as usual.
 
-    \item \textbf{Clamped ($v_{c}^{*}$) --- flat near zero crossings.}
-          As shown in \figref{fig:paper_fig7}, the reference follows the
-          sinusoid for most of the cycle but is \emph{held flat}
-          (clamped) for a portion $\varphi$ of each half-cycle near the
-          zero crossing.  The clamping angle $\varphi$ is a free
-          parameter the algorithm can tune.  Holding the reference flat
-          forces the cell output to dwell at a fixed level for that
-          interval, changing the shape of $v_i(t)$ and therefore the
-          time-average of $v_i \cdot \ig$ --- i.e.\ the loading power.
+    \item \textbf{Within a window of half-width $\varphi$ around each
+          zero crossing:} the reference is \emph{frozen} at the
+          boundary value --- the sinusoidal value at the moment the
+          window began.  For a positive-to-negative zero crossing at
+          angle $\theta_{0}$, the reference is held at
+          $M\sin(\theta_{0} - \varphi)$ throughout the window
+          $[\theta_{0}-\varphi,\;\theta_{0}+\varphi]$.
+
+    \item \textbf{After the window:} the reference resumes tracking
+          the (now negative) sinusoid from the boundary value.
 \end{enumerate}
-\end{circuitbox}
 
-\begin{warningbox}[Clamping is not the same as changing $M$]
-Changing $M$ scales the entire sinusoid up or down uniformly.
-Clamping reshapes the waveform: the peak amplitude is unchanged but
-the flat region replaces the portion near the zero crossing.  These
-are independent knobs.  The paper uses both together: $M$ is fixed by
-the current controller; $\varphi$ is what the balancing algorithm
-adjusts.
+The key physical effect: instead of passing smoothly through zero,
+the cell output \emph{dwells} at a small but nonzero level for the
+duration $2\varphi$.  This means the integral
+$(1/T)\!\int_{0}^{T}\! v_{c}^{*}\,\ig\,dt$ is \emph{larger} than its
+non-clamped counterpart, because the flat region contributes net
+positive area during the positive half-cycle (and net negative area
+during the negative half-cycle) instead of cancelling to zero at the
+crossing.
+
+\begin{physbox}[How $\varphi$ controls loading power]
+Think of it this way.  Near a zero crossing, the sinusoid is heading
+from positive to negative (or vice versa).  If we freeze it at a
+small positive value for a window $2\varphi$, the grid current
+$\ig$ is still flowing in the positive direction during that window.
+The product $v_c^{*} \cdot \ig > 0$ throughout the window, adding
+extra positive energy to the integral.  The wider $\varphi$ is, the
+longer this dwell, and the larger the extra contribution.  This is
+why the clamped loading power \emph{increases} with $\varphi$, as
+confirmed by \figref{fig:paper_fig8}.
+\end{physbox}
+
+\begin{warningbox}[$\varphi$ and $M$ are independent knobs]
+Changing $M$ scales the entire sinusoid uniformly --- it shifts every
+point on the waveform up or down proportionally.  Changing $\varphi$
+\emph{reshapes} the waveform without touching the peak amplitude.
+In the paper: $M$ is fixed by the outer voltage and inner current
+control loops; $\varphi$ is the free parameter the balancing algorithm
+adjusts independently per cell.
 \end{warningbox}
 
 % ── §3.3 ─────────────────────────────────────────────────────────────────────
@@ -777,6 +824,61 @@ panels side by side:
           which cell gets which mode.
 \end{itemize}
 \end{statebox}
+
+% ── §3.4 ─────────────────────────────────────────────────────────────────────
+\subsection{Overview: How the Two Modes Are Assigned}
+\label{subsec:algorithm_overview}
+
+\figentry{fig:paper_fig4}{DLVBMCHBC_Fig4_page03}%
+    {Principle of the proposed method (paper Fig.\,4).  All measured
+     DC-link voltages $V_{dc,iH}$ are fed into a sorting algorithm
+     together with the reference $V_{dc,H}^{*}$.  The sorted list
+     places the reference somewhere in the middle.  Cells ranked
+     above the reference receive one modulation mode; cells ranked
+     below receive the other.  Which mode goes to which group flips
+     depending on the sign of $\vg\cdot\ig$ (power flow direction).}{0.72}
+
+Now that we have the two tools (non-clamped and clamped), the question
+is: which cell gets which mode at any given moment?
+\figref{fig:paper_fig4} shows the answer in one diagram.
+
+\begin{circuitbox}[The Assignment Rule in Three Steps]
+\begin{enumerate}
+    \item \textbf{Measure.}  Sample all DC-link voltages
+          $V_{dc,1H},\,V_{dc,2H},\,\ldots,\,V_{dc,nH}$ and the
+          reference $V_{dc,H}^{*}$.
+
+    \item \textbf{Sort.}  Rank all voltages in descending order and
+          locate where $V_{dc,H}^{*}$ falls in the list:
+          \[
+              V_{dc,1H} \;>\; V_{dc,2H} \;>\; \cdots \;>\;
+              \underbrace{V_{dc,H}^{*}}_{\text{reference}} \;>\;
+              \cdots \;>\; V_{dc,nH}
+          \]
+          Cells \emph{above} the reference are overcharged
+          ($V_{dc,iH} > V_{dc,H}^{*}$) and need to shed more energy.
+          Cells \emph{below} are undercharged or on-target.
+
+    \item \textbf{Assign.}  The sign of the instantaneous power
+          $\vg\cdot\ig$ tells us whether the grid is absorbing or
+          delivering energy right now:
+          \begin{itemize}
+              \item If $\vg\cdot\ig < 0$ (cell delivering to grid):
+                    overcharged cells get \emph{non-clamped}
+                    ($v_{nc}^{*}$); undercharged cells get
+                    \emph{clamped} ($v_c^{*}$).
+              \item If $\vg\cdot\ig > 0$ (grid delivering to cell):
+                    the assignment flips.
+          \end{itemize}
+          The flip ensures that regardless of power flow direction,
+          the overcharged cell always ends up drawing more loading
+          power and the undercharged cell draws less.
+\end{enumerate}
+\end{circuitbox}
+
+The full worked case study (two cells, four time regions) and the
+generalisation to $n$ cells (five possible positions of $V_{dc,H}^{*}$
+in a four-cell sorted list) are treated in the next section.
 
 \clearpage
 
