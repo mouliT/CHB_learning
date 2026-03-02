@@ -488,4 +488,152 @@ paper solves --- and does so $13\times$ faster than a PI controller.
 
 \clearpage
 
+% ============================================================
+\section{From Loading Power to Control}
+\label{sec:loading_power_control}
+% ============================================================
+
+Section~1 introduced loading power $\PHi{i}$ as an integral and stated
+that the controller must set it equal to $P_{i,\mathrm{src}}$ every
+grid cycle.  Before designing any controller we need a \emph{closed-form
+expression} for $\PHi{i}$ --- one that shows clearly which knob
+($\Mi$, later $\phic$) the modulator can turn.
+
+% ── §2.1 ─────────────────────────────────────────────────────────────────
+\subsection{Evaluating the Loading Power Integral}
+\label{subsec:PH_derivation}
+
+The definition from Section~1 is:
+\[
+    \PHi{i} \;=\; \frac{1}{T}\int_{0}^{T} v_i(t)\,\ig(t)\,\mathrm{d}t
+\]
+
+\textbf{Step 1 — Write down the two signals.}
+
+The fundamental component of cell $i$'s output voltage (averaged over
+one switching period, linear modulation):
+\[
+    v_i(t) = \Vdci{i}\,\Mi\,\sin(\omg t)
+\]
+
+The grid current (sinusoidal, lagging the voltage reference by the
+power-factor angle $\phig$):
+\[
+    \ig(t) = \Ig\,\sin(\omg t - \phig)
+\]
+
+\textbf{Step 2 — Substitute into the integral.}
+\[
+    \PHi{i}
+    = \frac{\Vdci{i}\Mi\Ig}{T}
+      \int_{0}^{T} \sin(\omg t)\,\sin(\omg t - \phig)\,\mathrm{d}t
+\]
+
+\textbf{Step 3 — Use the product-to-sum identity.}
+
+$\sin A \sin B = \tfrac{1}{2}[\cos(A-B) - \cos(A+B)]$, so:
+\[
+    \sin(\omg t)\,\sin(\omg t - \phig)
+    = \tfrac{1}{2}\bigl[\cos(\phig) - \cos(2\omg t - \phig)\bigr]
+\]
+
+\textbf{Step 4 — Integrate term by term.}
+
+The $\cos(\phig)$ term is a constant; the $\cos(2\omg t - \phig)$ term
+is a sinusoid at \emph{twice} the grid frequency, whose integral over
+exactly one period $T = 2\pi/\omg$ is zero:
+\[
+    \frac{1}{T}\int_{0}^{T}\cos(2\omg t - \phig)\,\mathrm{d}t = 0
+\]
+
+\textbf{Result --- the non-clamped loading power:}
+
+\begin{eqnbox}[Non-Clamped Loading Power $\PHnc$]
+\[
+    \boxed{
+    \PHi{i}^{\,\mathrm{nc}}
+    \;=\; \frac{1}{2}\,\Vdci{i}\,\Mi\,\Ig\,\cos\phig
+    }
+\]
+\begin{itemize}
+    \item $\Vdci{i}$ --- DC-link voltage of cell $i$ (state variable,
+          measured each cycle).
+    \item $\Mi$ --- modulation index of cell $i$
+          (\textbf{the control knob}, $0 \leq \Mi \leq 1$).
+    \item $\Ig$ --- grid current amplitude (measured, same for all cells).
+    \item $\cos\phig$ --- grid power factor (fixed by the load/grid).
+\end{itemize}
+This is called \emph{non-clamped} because it assumes linear, unclipped
+sinusoidal modulation.  When the paper introduces clamped modulation in
+Section~4, a second free variable $\phic$ enters and $\PHi{i}$ takes a
+different form.
+\end{eqnbox}
+
+\begin{physbox}[What the Formula Tells You]
+Rearranging for $\Mi$ gives the required modulation index to achieve a
+target loading power $\PHi{i}^{*}$:
+\[
+    \Mi^{*} = \frac{2\,\PHi{i}^{*}}{\Vdci{i}\,\Ig\,\cos\phig}
+\]
+The controller therefore needs to measure three quantities
+($\Vdci{i}$, $\Ig$, $\cos\phig$) and know the target loading power
+$\PHi{i}^{*} = P_{i,\mathrm{src}}$ to compute $\Mi^{*}$ directly ---
+\emph{no iteration, no trial-and-error.}
+The paper exploits this closed form to achieve one-cycle balancing.
+\end{physbox}
+
+% ── §2.2 ─────────────────────────────────────────────────────────────────
+\subsection{The Overall Control Scheme}
+\label{subsec:control_scheme}
+
+\figentry{fig:paper_fig2}{DLVBMCHBC_Fig2_page02}%
+    {Typical control scheme for the grid-connected CHB converter
+     (paper Fig.\,2). An outer current control loop (top) regulates the
+     grid current $\ig$ by generating a common modulation reference.
+     An inner voltage balancing loop (bottom) adjusts each cell's
+     individual modulation index $\Mi$ to keep all DC-link voltages
+     equal at their target $\Vdci{} = \Vtot/n$.}{0.90}
+
+\figref{fig:paper_fig2} shows the two-layer control structure used
+throughout the paper.
+
+\begin{circuitbox}[Two-Layer Control --- What Each Layer Does]
+\begin{enumerate}
+    \item \textbf{Outer loop --- grid current control.}
+          A standard current controller (PR or PI in the synchronous
+          frame) compares the measured grid current $\ig$ to its
+          reference $\ig^{*}$ and outputs a common voltage reference
+          $v_{\mathrm{ref}}(t) = V_{\mathrm{ref}}\sin(\omg t)$.
+          This reference is shared by all $n$ cells.
+          Its job: keep $\ig$ sinusoidal and at the right amplitude.
+
+    \item \textbf{Inner loop --- DC-link voltage balancing.}
+          Each cell $i$ gets its own modulation index $\Mi$ computed
+          by the balancing algorithm.  The algorithm reads
+          $\Vdci{i}$ and adjusts $\Mi$ so that the loading power
+          $\PHi{i}$ tracks $P_{i,\mathrm{src}}$.
+          The \emph{sum} $\sum_i \Vdci{i}\Mi$ is constrained to remain
+          equal to $V_{\mathrm{ref}}$, so the outer loop's current
+          command is respected even while individual $\Mi$ values differ.
+\end{enumerate}
+\end{circuitbox}
+
+\begin{statebox}[The Constraint the Balancing Loop Must Obey]
+The outer loop demands a total voltage:
+\[
+    \vg(t) = \sum_{i=1}^{n} \Vdci{i}\,\Mi\,\sin(\omg t)
+           = V_{\mathrm{ref}}\,\sin(\omg t)
+\]
+So any redistribution of $\Mi$ values by the balancing loop must
+satisfy:
+\[
+    \sum_{i=1}^{n} \Vdci{i}\,\Mi \;=\; V_{\mathrm{ref}}
+\]
+This is the \emph{coupling constraint} between the two loops.
+Balancing is not free --- every change to one cell's $\Mi$ forces
+compensating changes in the others to keep the sum fixed.
+\end{statebox}
+
+\clearpage
+
 \end{document}
