@@ -488,205 +488,165 @@ but by replacing the architecture entirely.
 \label{sec:proposed}
 % ============================================================
 
-\textit{This section introduces the paper's key idea: instead of nudging modulation
-indices by small increments, shape the modulation waveform itself to access a
-wider range of loading power --- then solve directly for the waveform parameters
-that achieve exact balance in one balancing period.}
+\textit{This section rebuilds the proposed method in the same order as the IEEE
+paper: first the principle (two complementary modulation signals), then how it is
+updated in time, and finally why it increases the range of achievable loading
+power.}
 
 % ── §3.1 ─────────────────────────────────────────────────────────────────
-\subsection{The Big Picture: Algorithm Overview}
-\label{subsec:algo_overview}
+\subsection{Principle: Two Complementary Modulation Signals}
+\label{subsec:principle}
+
+The inner current controller (Section~\ref{sec:control}) produces a
+\emph{sinusoidal} reference signal $v^{*}$.
+In the paper, $v^{*}$ is a \textbf{normalised} signal (bounded within the linear
+modulation region), and $n\,v^{*}$ represents the total normalised reference of
+the full CHB string.
+If the sum of the cell outputs follows this reference, the grid current can be
+kept sinusoidal.
+The key trick in the paper is to let \emph{individual} cells use a discontinuous
+signal, as long as the \emph{sum across cells} is still sinusoidal.
+
+The method defines two operation modes for a cell: \textbf{clamped} and
+\textbf{non-clamped}.
+The clamped modulation signal depends only on the sign of the grid voltage:
+
+\begin{eqnbox}[Clamped and Non-Clamped Signals (paper Eq.\,2--3)]
+\[
+v_{c}^{*} 
+=
+\begin{cases}
+1 & \text{if } \vg > 0 \\
+-1 & \text{if } \vg < 0
+\end{cases}
+\qquad
+v_{nc}^{*} = n\,v^{*} - v_{c}^{*}
+\]
+\[
+v_{c}^{*} + v_{nc}^{*} = n\,v^{*}
+\]
+\end{eqnbox}
+
+Read this as a construction rule:
+the algorithm creates two waveforms whose combined effect preserves the sinusoidal
+total reference demanded by the inner current loop.
 
 \figentry{fig:paper_fig4}{DLVBMCHBC_Fig4_page03}%
-    {Overview of the proposed modulation-based balancing algorithm
-     (paper Fig.\,4).
-     Each balancing period, the algorithm:
-     (1) ranks all $n$ cells by measured DC-link voltage $\Vdci{i}$,
-     (2) assigns each cell either \emph{clamped} or \emph{non-clamped}
-         modulation based on sign of $\vg\ig$ and rank,
-     (3) computes the clamping angle $\phic$ and modulation index $\Mi^{*}$
-         to achieve the exact target loading power $\PHi{i} = P_{i,\mathrm{src}}$.
-     The sorting and assignment rules are detailed in
-     Section~\ref{sec:algorithm}.}{0.9}
+    {Principle of the proposed method (paper Fig.\,4).
+     Measured cell voltages are sorted and compared to the reference.
+     Based on the sign of $\vg\ig$, cells are assigned either clamped
+     ($v_{c}^{*}$) or non-clamped ($v_{nc}^{*}$) modulation.
+     The key constraint is that the sum of all cell modulation signals remains
+     sinusoidal (paper Eq.\,3).}{0.9}
 
-The algorithm assigns one of two modulation modes to each cell every
-balancing period.
-Understanding both modes --- and their different loading power
-capabilities --- is the key to understanding the whole paper.
-
-% ── §3.2 ─────────────────────────────────────────────────────────────────
-\subsection{Two Modulation Modes}
-\label{subsec:two_modes}
-
-\textbf{Non-clamped mode.}
-Standard sinusoidal modulation:
-\[
-    v_{nc}^{*}(\theta) \;=\; \Mi\,\sin(\theta), \quad \theta = \omg t
-\]
-Amplitude is $\Mi \leq 1$.
-The waveform tracks the sinusoid at all times.
-
-\textbf{Clamped mode.}
-The reference is held (``clamped'') at $\pm 1$ for an interval of
-$2\phic$ centred on each peak, and follows a sinusoid elsewhere:
-
-\begin{eqnbox}[Clamped Reference Waveform (paper Eq.\,2)]
-\[
-    v_{c}^{*}(\theta) \;=\;
-    \begin{cases}
-        +1          & \text{if } \sin\theta \geq \cos\phic \text{ (near positive peak)} \\
-        \Mi\sin\theta & \text{if } |\sin\theta| < \cos\phic \text{ (middle region)} \\
-        -1          & \text{if } \sin\theta \leq -\cos\phic \text{ (near negative peak)}
-    \end{cases}
-\]
-where $\phic \in [0, \pi/2]$ is the \emph{clamping half-angle}
-(sine convention used in this document; paper Eq.\,6 uses
-$\varphi = 2\phic \in [0,\pi]$, cosine convention).
-\end{eqnbox}
-
-Key points about the clamped waveform:
-\begin{itemize}
-    \item The flat regions are at the \textbf{peaks} ($\pm 1$), not near
-          the zero crossings.
-          The cell is clamped to maximum output when the grid current
-          is largest --- exactly when it can deliver the most power.
-    \item The amplitude of the flat region is \textbf{1} (unit),
-          independent of $\Mi$.
-          This is what gives the clamped cell extra loading power
-          beyond what sinusoidal modulation at index $\Mi$ would provide.
-    \item At $\phic = 0$: no clamping, standard sinusoid.
-          At $\phic = \pi/2$: fully clamped (square wave at $\pm 1$).
-\end{itemize}
-
-\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
-    {Clamped modulation reference signal with clamping half-angle $\phic$
-     (paper Fig.\,7).
-     The waveform is held at $\pm 1$ for $2\phic$ centred on each peak.
-     Outside the clamped intervals the reference is sinusoidal with
-     modulation index $\Mi$.
-     The shaded regions show where the clamping is active.
-     Increasing $\phic$ extends the clamped interval, reducing $\Mi$
-     required to satisfy the coupling constraint and increasing the
-     loading power extracted from this cell.}{0.85}
-
-% ── §3.3 ─────────────────────────────────────────────────────────────────
-\subsection{Loading Power of Each Mode}
-\label{subsec:loading_power_derivation}
-
-\textbf{Non-clamped result.}
-With $v_i(t) = \Vdci{i}\,\Mi\,\sin\theta$ and
-$\ig(t) = \Ig\,\sin(\theta - \phig)$, the product-to-sum identity
-gives immediately:
-
-\begin{eqnbox}[Non-Clamped Loading Power]
-\[
-    \PHnc \;=\; \frac{1}{2}\,\Vdci{i}\,\Mi\,\Ig\,\cos\phig
-\]
-The only control variable is $\Mi \in [0,1]$.
-Maximum achievable: $\PHnc^{\max} = \frac{1}{2}\,\Vdci{i}\,\Ig\,\cos\phig$
-at $\Mi = 1$.
-\end{eqnbox}
-
-\textbf{Clamped result.}
-The clamped waveform has a piecewise form, so the loading power integral
-must be evaluated in pieces.
-The calculation splits the period into three intervals: the two clamped
-intervals near the peaks, and the sinusoidal middle region.
-The result is (paper Eq.\,6):
-
-\begin{eqnbox}[Clamped Loading Power]
-\[
-    \PHcl \;=\; \frac{\Vdci{i}\,\Ig\,\cos\phig}{2\pi}
-    \Bigl[
-        \Mi(\pi - 2\phic) - \Mi\sin(2\phic) + 4\sin(\phic)
-    \Bigr]
-\]
-Two free variables: $\Mi$ and $\phic$.
-\end{eqnbox}
-
-\textbf{The ratio at full clamping ($\phic = \pi/2$, square wave):}
-\[
-    \frac{\PHcl}{\PHnc}\bigg|_{\phic = \pi/2}
-    \;=\; \frac{4}{\pi \Mi}
-\]
-At nominal $\Mi = 0.78$: ratio $\approx 1.63$.
-At $\Mi = 0.70$: ratio $\approx 1.82$.
-The ratio is \textbf{$\Mi$-dependent} --- lower $\Mi$ gives a larger
-ratio, which is why the paper's maximum imbalance capability surface
-rises at low $\Mi$ values.
-
-\begin{physbox}[Why clamping extracts more power]
-In non-clamped mode, the cell voltage near the peaks is $\Vdci{i}\Mi\sin\theta < \Vdci{i}$.
-In clamped mode, it is held at $\Vdci{i}$ (the full DC-link voltage).
-The grid current $\ig$ is largest near the peaks.
-Power = voltage $\times$ current.
-By clamping at unit amplitude exactly when the current is high,
-the clamped cell delivers significantly more power per cycle than a
-purely sinusoidal cell with the same nominal $\Mi$.
+\begin{physbox}[Why this helps balancing]
+In conventional PI balancing, each cell stays sinusoidal and can only change its
+loading power by changing its sinusoidal amplitude (bounded by $|M|\le 1$).
+The proposed method adds a new lever: \emph{waveform shape}.
+By clamping some cells to $\pm 1$ for part of the cycle, the method changes the
+fundamental component of the cell voltage, and therefore changes the average
+loading power it can process.
 \end{physbox}
 
-% ── §3.4 ─────────────────────────────────────────────────────────────────
-\subsection{The Loading Power Surface}
-\label{subsec:loading_power_surface}
+% ── §3.2 ─────────────────────────────────────────────────────────────────
+\subsection{When the Algorithm Updates (and Why It Can Be Fast)}
+\label{subsec:implementation_overview}
 
-\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
-    {Loading power surfaces normalised to the non-clamped base case
-     (paper Fig.\,8).
-     \textbf{Left (clamped surface):} $\PHcl / \PHnc^{0}$ as a function of
-     modulation index $\Mi$ and clamping half-angle $\phic$.
-     At small $\phic$ (little clamping) the surface approaches 1.0 p.u.;
-     at large $\phic$ and low $\Mi$ it reaches $\approx 1.82$ p.u.
-     The ridge at large $\phic$ is where the ratio $4/(\pi\Mi)$ peaks.
-     \textbf{Right (non-clamped surface):} $\PHnc / \PHnc^{0}$ as a function
-     of $\Mi$ and $\phic$.
-     This surface \emph{falls} as $\phic$ increases, reaching $\approx 0.18$
-     p.u.\ at $(\Mi=0.7, \phic=\pi/2)$, because when one cell is clamped
-     the others must reduce their modulation indices to satisfy the coupling
-     constraint --- they give up power to compensate.
-     The gap between the two surfaces is the range of power redistribution
-     the algorithm exploits.}{0.95}
+The balancing decision is recomputed periodically with update period $t_{bal}$.
+The paper chooses $t_{bal}$ such that it is a divisor of the grid period:
+\[
+t_f = a\,t_{bal}, \quad a \in \mathbb{Z}
+\]
+so the assignment can change multiple times within one grid cycle.
 
-The key insight from \figref{fig:paper_fig8}:
-
-\begin{statebox}[What the loading power surface means for balancing]
-\begin{itemize}
-    \item \textbf{Clamped cell} can absorb/deliver up to 1.82$\times$ the
-          ``normal'' loading power at full clamping.
-    \item \textbf{Non-clamped cells} drop to as low as 0.18$\times$ normal
-          power when compensating.
-    \item The \textbf{ratio between the two} is what enables rapid balancing:
-          the algorithm can move large amounts of power between cells in a
-          single balancing period, not just tiny increments.
-    \item The conventional PI method is limited to small $\Delta M_i$
-          corrections; the proposed method can use the full width of this surface.
-\end{itemize}
+\begin{statebox}[The speed advantage in one sentence]
+In the conventional PI method, the balancing dynamics are constrained by the
+outer voltage loop bandwidth (the hierarchy $t_{sw} \ll t_c \ll t_v \ll t_{bal}$).
+In the proposed method, the balancing update $t_{bal}$ is not tied to $t_v$ and
+$t_c$ in the same way, so it can be made much faster.
 \end{statebox}
 
-% ── §3.5 ─────────────────────────────────────────────────────────────────
-\subsection{Target Modulation Index}
-\label{subsec:target_Mi}
+This section only establishes \emph{what} is updated and \emph{when}.
+The exact sorting and assignment rules (including the role of the sign of
+$\vg\ig$ and the multi-cell pairing cases) are the topic of
+Section~\ref{sec:algorithm}.
 
-Given the closed-form expressions for loading power, the controller can
-\emph{invert} them to solve directly for the modulation parameters that
-achieve balance.
+% ── §3.3 ─────────────────────────────────────────────────────────────────
+\subsection{Why Clamping Increases the Loading-Power Range}
+\label{subsec:capability}
 
-For a non-clamped cell, setting $\PHnc = P_{i,\mathrm{src}}$ and
-solving for $\Mi^{*}$:
+The average loading power of a cell depends on how its voltage waveform lines up
+with the (approximately sinusoidal) grid current over one grid period.
+The important point is that only the \textbf{fundamental component} of the cell
+voltage contributes to the cycle-average power exchange; higher harmonics average
+to zero over a full period.
 
-\begin{eqnbox}[Target Modulation Index (Non-Clamped)]
+\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
+    {Clamped modulation signal with varied clamping angle $\phic$
+     (paper Fig.\,7).
+     Increasing $\phic$ widens the clamped interval, pushing the waveform closer
+     to a square wave and increasing its fundamental component.}{0.85}
+
+To quantify this, the paper introduces a \textbf{clamping angle} $\phic$ and varies
+it from $0$ to $\pi$ (0 to 180 degrees), as shown in paper Fig.\,7.
+Note that this is the paper's angle convention for this section.
+
+The paper computes the fundamental magnitude using Fourier series.
+For a periodic signal $f(\theta)$, the fundamental coefficients are:
+
+\begin{eqnbox}[Fundamental From Fourier Coefficients (paper Eq.\,4--5)]
 \[
-    \Mi^{*} \;=\; \frac{2\,P_{i,\mathrm{src}}}{\Vdci{i}\,\Ig\,\cos\phig}
+a_1 = \frac{1}{\pi}\int_{0}^{2\pi} f(\theta)\cos\theta\,d\theta,
+\qquad
+b_1 = \frac{1}{\pi}\int_{0}^{2\pi} f(\theta)\sin\theta\,d\theta
 \]
-This is exact --- no iteration required.
-The controller measures $\Vdci{i}$, $\Ig$, $\cos\phig$, and knows
-$P_{i,\mathrm{src}}$ (estimated from DC source measurements).
+\[
+F = \sqrt{a_1^2 + b_1^2}
+\]
 \end{eqnbox}
 
-For a clamped cell, both $\Mi$ and $\phic$ are free variables.
-The algorithm fixes $\Mi$ from the coupling constraint
-($\sum_i \Vdci{i}\,\Mi = \vref$) and solves for $\phic$ to hit the
-target loading power.
-The exact clamped-cell solution is detailed in Section~\ref{sec:algorithm}.
+Using the piecewise clamped waveform (paper Eq.\,6) with nominal modulation index
+$M$ (paper notation):
+
+\begin{eqnbox}[Piecewise Clamped Waveform (paper Eq.\,6)]
+\[
+f_c(\theta)=
+\begin{cases}
+1 & \theta\in[0,\phic]\\
+M\cos\theta & \theta\in[\phic,\pi] \text{ and } \theta\in[\pi+\phic,2\pi]\\
+-1 & \theta\in[\pi,\pi+\phic]
+\end{cases}
+\]
+\end{eqnbox}
+
+the paper derives the fundamental magnitude of the clamped signal $F_c(\phic)$ and
+the complementary non-clamped signal $F_{nc}(\phic)$ (paper Eq.\,7):
+
+\begin{eqnbox}[Fundamental Magnitudes (paper Eq.\,7)]
+\[
+F_c(\phic) = \frac{1}{\pi}
+\sqrt{\left(0.5M\sin(2\phic) - M\phic - 2\cos\phic + \pi M + 2\right)^2
++ \left(\sin\phic\,(2 - M\sin\phic)\right)^2}
+\]
+\[
+F_{nc}(\phic) = 2M - F_c(\phic)
+\]
+\end{eqnbox}
+
+\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
+    {Loading power as a function of the nominal modulation index $M$ and the
+     clamping angle $\phic$ (paper Fig.\,8).
+     The clamped-mode loading power increases with $\phic$; the complementary
+     non-clamped mode decreases accordingly.
+     This widened range of achievable loading powers is what enables faster
+     balancing than PI-based methods.}{0.95}
+
+\begin{statebox}[Numbers to remember from paper Fig.\,8]
+At $M=0.7$ and $\phic=\pi$ (180 degrees), the paper reports approximately
+1.82 p.u. loading power in clamped mode and 0.18 p.u. in non-clamped mode.
+That large spread is the ``extra room'' the algorithm uses to move energy between
+cells quickly.
+\end{statebox}
 
 \clearpage
 
