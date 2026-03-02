@@ -643,4 +643,141 @@ compensating changes in the others to keep the sum fixed.
 
 \clearpage
 
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Two Modulation Strategies --- The Paper's Key Idea}
+\label{sec:two_modes}
+% ══════════════════════════════════════════════════════════════════════════════
+
+We established in \S\ref{sec:loading_power} that the balancing algorithm
+adjusts each cell's modulation index $\Mi$ so that its loading power
+$\PHi{i}$ matches its source power $P_{i,\mathrm{src}}$.  But \emph{how
+much correction} can you actually achieve by varying $\Mi$?  This section
+shows why a simple per-cell PI controller is limited, and how the paper
+breaks that limit with a two-mode modulation strategy.
+
+% ── §3.1 ─────────────────────────────────────────────────────────────────────
+\subsection{The Conventional PI Approach and Its Limit}
+\label{subsec:pi_limit}
+
+\figentry{fig:paper_fig3}{DLVBMCHBC_Fig3_page02}%
+    {Conventional PI loop-based voltage balancing algorithm
+     (paper Fig.\,3).  Each cell $i$ has its own PI controller that
+     compares the common DC-link target $V_{dc,H}^{*}$ to the measured
+     voltage $V_{dc,iH}$ and produces a small correction
+     $\Delta v_{iH}^{*}$.  This correction is added to the shared
+     modulation reference $v^{*}$ to give each cell its individual
+     voltage reference $v_{iH}^{*}$.}{0.72}
+
+The conventional approach shown in \figref{fig:paper_fig3} is
+straightforward: if cell $i$ is too high ($V_{dc,iH} > V_{dc,H}^{*}$),
+the PI controller raises $\Delta v_{iH}^{*}$, which increases that
+cell's effective modulation index and therefore its loading power,
+drawing more energy out of its capacitor.
+
+\begin{physbox}[Why PI Correction Has a Hard Ceiling]
+The PI output $\Delta v_{iH}^{*}$ is simply added to a sinusoidal
+reference $v^{*} = V_{\mathrm{ref}}\sin(\omg t)$.  The resulting
+cell reference is still sinusoidal in shape:
+\[
+    v_{iH}^{*}(t) \;=\; (V_{\mathrm{ref}} + \Delta v_{iH}^{*})\,\sin(\omg t)
+\]
+The modulation index is bounded: $M_i \leq 1$ (over-modulation causes
+waveform distortion).  So the maximum extra loading power the PI method
+can deliver is set by how much headroom remains between the current
+$M_i$ and 1.  At high nominal modulation depths (e.g.\ $M = 0.9$),
+that headroom is only 10\,\% --- very little room to push a heavily
+imbalanced cell back in line.
+\end{physbox}
+
+This hard ceiling on achievable correction power is exactly what
+\figref{fig:paper_fig9} (Section~\ref{sec:results}) will confirm
+quantitatively.  The question is: can we give the balancing algorithm
+\emph{more} correction range without violating the modulation limit?
+
+% ── §3.2 ─────────────────────────────────────────────────────────────────────
+\subsection{Clamped Modulation --- A New Degree of Freedom}
+\label{subsec:clamped_mode}
+
+\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
+    {Clamped modulation signal with varied clamping angle $\varphi$
+     (paper Fig.\,7).  The solid curve is the clamped reference; the
+     dotted lines show the clamped (flat) portions near the zero
+     crossings.  Increasing $\varphi$ widens the flat region.}{0.62}
+
+The paper's key insight is to use \emph{two fundamentally different
+waveform shapes} as modulation references instead of one:
+
+\begin{circuitbox}[Two Modulation Modes]
+\begin{enumerate}
+    \item \textbf{Non-clamped ($v_{nc}^{*}$) --- standard sinusoidal.}
+          The modulation reference is $M\sin(\omg t)$ for the entire
+          cycle.  This is the conventional mode.  Loading power is:
+          \[
+              \PHnc \;=\; \tfrac{1}{2}\,\Vdc\,M\,\Ig\,\cos\phig
+          \]
+          No free parameter beyond $M$ itself.
+
+    \item \textbf{Clamped ($v_{c}^{*}$) --- flat near zero crossings.}
+          As shown in \figref{fig:paper_fig7}, the reference follows the
+          sinusoid for most of the cycle but is \emph{held flat}
+          (clamped) for a portion $\varphi$ of each half-cycle near the
+          zero crossing.  The clamping angle $\varphi$ is a free
+          parameter the algorithm can tune.  Holding the reference flat
+          forces the cell output to dwell at a fixed level for that
+          interval, changing the shape of $v_i(t)$ and therefore the
+          time-average of $v_i \cdot \ig$ --- i.e.\ the loading power.
+\end{enumerate}
+\end{circuitbox}
+
+\begin{warningbox}[Clamping is not the same as changing $M$]
+Changing $M$ scales the entire sinusoid up or down uniformly.
+Clamping reshapes the waveform: the peak amplitude is unchanged but
+the flat region replaces the portion near the zero crossing.  These
+are independent knobs.  The paper uses both together: $M$ is fixed by
+the current controller; $\varphi$ is what the balancing algorithm
+adjusts.
+\end{warningbox}
+
+% ── §3.3 ─────────────────────────────────────────────────────────────────────
+\subsection{How Clamping Changes Loading Power}
+\label{subsec:loading_power_surfaces}
+
+\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
+    {Loading power as a function of nominal modulation index $M$ and
+     clamping angle $\varphi$ (paper Fig.\,8).
+     (a)~Clamped mode: the loading power surface rises steeply,
+     reaching up to ${\approx}1.8$\,p.u.\ at small $\varphi$.
+     (b)~Non-clamped mode: the surface is nearly flat at
+     ${\approx}1$\,p.u.\ across all $M$ and $\varphi$ --- no tuning
+     knob.}{0.88}
+
+\figref{fig:paper_fig8} is the quantitative payoff.  Compare the two
+panels side by side:
+
+\begin{statebox}[Reading the Loading Power Surfaces]
+\begin{itemize}
+    \item \textbf{Non-clamped (right panel):} the surface is almost
+          perfectly flat at 1\,p.u.\ regardless of $M$ or $\varphi$.
+          Once $M$ is set by the current controller, the loading power
+          is fixed.  The balancing algorithm has \emph{no room to
+          manoeuvre}.
+
+    \item \textbf{Clamped (left panel):} the surface climbs from
+          1\,p.u.\ (large $\varphi$, i.e.\ heavily clamped) up to
+          ${\approx}1.8$\,p.u.\ (small $\varphi$, i.e.\ barely
+          clamped).  By choosing $\varphi$, the algorithm can push a
+          cell's loading power \emph{up to 80\,\% above the baseline} ---
+          without ever exceeding $M = 1$.
+
+    \item \textbf{The balancing idea in one sentence:}
+          assign clamped mode to cells that need to absorb \emph{more}
+          power (overcharged capacitors), and non-clamped mode to cells
+          that should absorb \emph{less} (undercharged or on-target).
+          The next section (\S\ref{sec:sorting_algorithm}) shows exactly
+          how the algorithm decides which cell gets which mode.
+\end{itemize}
+\end{statebox}
+
+\clearpage
+
 \end{document}
