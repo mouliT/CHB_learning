@@ -13,6 +13,7 @@
 3. **Pull before editing** if the user says they pushed from Overleaf (`git pull` first).
 4. **Read the paper figure before describing it.** Do NOT describe control loops, signals, or block-diagram topology from prior knowledge alone — look at the actual figure image. Classic mistake: assuming "outer = current, inner = voltage" when this paper's Fig. 2 has outer = DC voltage control, inner = current control.
 5. **Never use `\ref` to a label that does not yet exist.** Forward references to unwritten sections or undefined figures compile as `??`. Rule: if the target section/figure is not yet in the document, use plain text (e.g. "the next section" or "paper Fig. 9") instead of a `\ref`.
+6. **Every paper figure must be explained in full in its assigned section.** Do not silently skip any figure — even if a figure is deferred to a later section, it must receive a complete explanation (caption + prose + box) when that section is written. Splitting concepts across sections is fine; omitting a figure's explanation entirely is not.
 
 ## Document Structure
 - Uses `\setcounter{section}{-1}` so Section 0 exists before Section 1.
