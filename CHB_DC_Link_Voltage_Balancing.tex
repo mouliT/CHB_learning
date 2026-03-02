@@ -672,8 +672,18 @@ structure used throughout the paper.
 \textbf{Balancing control signals.}
 \begin{itemize}
   \item $V_{dc,H}^{*}$ (\emph{reference}, top arrow).
-        Common per-cell DC target $= \sum V_{dc,nH}^{*} / n$.
-        Pure arithmetic --- each cell aims for the same voltage.
+        Per-cell DC target, derived as $V_{dc,H}^{*} = \sum V_{dc,nH}^{*} / n$
+        from the outer-loop total reference.
+        The value of $\sum V_{dc,nH}^{*}$ is determined by the grid:
+        the total DC bus must satisfy
+        $\sum V_{dc,nH}^{*} \geq \hat{V}_{g} / M_{\mathrm{nom}}$
+        (peak grid voltage divided by the nominal modulation depth),
+        so that the inner loop can always synthesise the required $v^{*}$.
+        This is a \emph{system constraint}, not a free choice.
+        $V_{dc,H}^{*}$ is \textbf{not} computed from the individual
+        source powers $P_{i,\mathrm{src}}$; rather, the source powers
+        are what vary (via $\ig^{*}$) to keep the actual DC voltages
+        tracking this target.
   \item $V_{dc,1H},\ldots,V_{dc,nH}$ (\emph{measurements}, bottom arrows).
         Individual cell voltages from the same isolated sensors used
         by the outer loop.  The balancing algorithm compares each
@@ -1136,16 +1146,18 @@ panels side by side:
           manoeuvre}.
 
     \item \textbf{Clamped (left panel):} the surface climbs from
-          1\,p.u.\ (large $\varphi$, i.e.\ heavily clamped) up to
-          ${\approx}1.8$\,p.u.\ (small $\varphi$, i.e.\ barely
-          clamped).  By choosing $\varphi$, the algorithm can push a
-          cell's loading power \emph{up to 80\,\% above the baseline} ---
+          ${\approx}1$\,p.u.\ (small $\varphi \to 0$, i.e.\ barely
+          clamped, near sinusoid) up to ${\approx}1.8$\,p.u.\ (large
+          $\varphi$, i.e.\ heavily clamped, approaching a square wave).
+          By choosing $\varphi$, the algorithm can push a cell's loading
+          power \emph{up to 80\,\% above the baseline} ---
           without ever exceeding $M = 1$.
 
     \item \textbf{The balancing idea in one sentence:}
-          assign clamped mode to cells that need to absorb \emph{more}
-          power (overcharged capacitors), and non-clamped mode to cells
-          that should absorb \emph{less} (undercharged or on-target).
+          in inverter mode, assign clamped mode to \emph{overcharged}
+          cells (they must \emph{deliver more} to the AC side to discharge
+          their capacitor), and non-clamped mode to undercharged or
+          on-target cells.
           The next section shows exactly how the algorithm decides
           which cell gets which mode.
 \end{itemize}
