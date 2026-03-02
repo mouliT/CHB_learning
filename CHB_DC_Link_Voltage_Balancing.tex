@@ -348,4 +348,106 @@ $P_{i,\mathrm{src}}$  & DC source power, cell $i$           & W; unequal between
 
 \clearpage
 
+% ============================================================
+\section{The Circuit --- What Is Actually Connected to What?}
+\label{sec:circuit}
+% ============================================================
+
+Section~0 described the CHB in words. This section puts real components
+on the page and names every wire, so that later equations have something
+concrete to refer to.
+
+% ── Fig 1 from the paper ──────────────────────────────────────────────────
+\figentry{fig:paper_fig1}{DLVBMCHBC_Fig1_page01}%
+    {Grid-connected CHB converter with unbalanced loading power
+     $\PHi{1} \neq \PHi{2} \neq \PHi{3}$ (paper Fig.\,1).
+     Each H-bridge cell has its own isolated DC-link capacitor fed by an
+     independent DC source. The AC output terminals of all $n$ cells are
+     connected in series; the series string drives the grid through
+     filter inductance $L_f$.}{0.75}
+
+\subsection{Reading the Circuit Diagram}
+
+\figref{fig:paper_fig1} shows the complete system. Start at the bottom
+and work upward.
+
+\begin{circuitbox}[Component-by-Component Walk-through]
+\begin{enumerate}
+    \item \textbf{DC sources (right side of each cell).}
+          Each cell $i$ has its own private DC source --- a PV string,
+          battery pack, or rectifier --- delivering power $P_{i,\mathrm{src}}$
+          and maintaining a DC-link capacitor at voltage $\Vdci{i}$.
+          The dashed isolation boundary in the figure is not decorative:
+          there is \emph{no} electrical path between the DC sides of
+          different cells.
+
+    \item \textbf{H-bridge switches (centre of each cell).}
+          Four transistors per cell chop the DC voltage at carrier
+          frequency $f_c$. The average AC voltage produced at the
+          output terminals over one switching period is
+          $\bar{v}_i = \Vdci{i}\Mi\sin(\omg t)$.
+
+    \item \textbf{AC series string (left column).}
+          The AC output terminals are stacked in series:
+          the top terminal of cell~$i$ connects to the bottom terminal
+          of cell~$(i{+}1)$. The total voltage across the string is
+          $\vg = v_1 + v_2 + \cdots + v_n$.
+
+    \item \textbf{Filter inductor $L_f$.}
+          Sits between the AC string and the grid. It attenuates
+          the high-frequency PWM harmonics and forces the grid
+          current $\ig$ to be approximately sinusoidal.
+          Crucially, \emph{the same} $\ig$ flows through every cell
+          in the series string --- there is no way for current to
+          take a different path.
+
+    \item \textbf{Grid (far left).}
+          Modelled as an ideal sinusoidal voltage source
+          $v_{\mathrm{grid}}(t) = V_{\mathrm{grid}}\sin(\omg t + \phig)$.
+          The grid sets the frequency $\omg$ and the power-factor
+          angle $\phig$; the CHB controls the amplitude and phase of
+          $\vg$ to regulate $\ig$.
+\end{enumerate}
+\end{circuitbox}
+
+\subsection{The One Quantity That Drives Everything: Loading Power}
+\label{subsec:loading_power}
+
+Because the same current $\ig$ passes through every cell, each cell
+\emph{must} process its share of the AC power whether it likes it or
+not. But each cell also has its own DC source pushing power in from
+the right. The net power that actually charges or discharges the
+DC-link capacitor of cell $i$ is called its \textbf{loading power}:
+
+\begin{eqnbox}[Definition of Loading Power]
+\[
+    \PHi{i} \;=\; \frac{1}{T}\int_{0}^{T} v_i(t)\,\ig(t)\,\mathrm{d}t
+\]
+where $T = 1/f$ is one grid period. This is the average AC power
+\emph{delivered by cell $i$ to the grid} (positive = delivering,
+negative = absorbing). In steady state, $\PHi{i}$ must equal the
+DC source power $P_{i,\mathrm{src}}$ to keep $\Vdci{i}$ constant.
+\end{eqnbox}
+
+\begin{physbox}[Why ``Loading Power'' and Not Just ``Power''?]
+Every cell delivers power to the AC string. But the DC-link capacitor
+does not care about the total power flow --- it only cares about the
+\emph{imbalance} between what the DC source pushes in and what the
+AC side pushes out. Loading power is that imbalance, expressed as the
+average AC-side power per cell. When $\PHi{i} = P_{i,\mathrm{src}}$
+the capacitor voltage is constant; when they differ, the voltage drifts.
+\end{physbox}
+
+\begin{warningbox}[The Key Asymmetry]
+The grid current $\ig$ is \emph{shared} --- it is the same for every
+cell. The DC source powers $P_{i,\mathrm{src}}$ are \emph{independent}
+--- they depend on sunlight, battery state of charge, or deliberate
+power routing and can differ arbitrarily between cells.
+Consequently $\PHi{i}$ can be different for every cell, and the
+DC-link voltages $\Vdci{i}$ will drift unless the controller
+continuously corrects them. This is the problem the paper solves.
+\end{warningbox}
+
+\clearpage
+
 \end{document}
