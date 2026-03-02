@@ -16,7 +16,7 @@
 6. **Every paper figure must be explained in full in its assigned section.** Do not silently skip any figure — even if a figure is deferred to a later section, it must receive a complete explanation (caption + prose + box) when that section is written. Splitting concepts across sections is fine; omitting a figure's explanation entirely is not.
 
 ## Document Structure
-- Uses `\setcounter{section}{-1}` so Section 0 exists before Section 1.
+- Sections §1–§5 (no §0). Starts at `\section` with no counter offset.
 - LaTeX macros defined in preamble: `\vg`, `\ig`, `\Vdc`, `\Vdci{i}`, `\Mi`, `\phic`, `\PH`, `\PHi{i}`, `\PHnc`, `\PHcl`, `\Vtot`, `\figref`, `\omg`, `\phig`, `\Ig`
 - Figure macro: `\figentry{label}{filename-no-ext}{caption}{width}` (4 args, no .png extension)
 - `\graphicspath{{figures/}}` — all PNGs live in `figures/`
@@ -34,19 +34,27 @@
 3. **Grid voltage equation:** `v_g = v_1 + v_2 + ... + v_n` (NOT `i_g × sum(...)` — that is dimensionally wrong).
 4. **Torch battery analogy:** removed by user — do not re-introduce it.
 5. **Control loop hierarchy (§2.2, paper Fig. 2):** outer loop = DC-link voltage control (slow, produces I_g*); inner loop = grid current control (fast, produces v_ref); balancing algorithm is a third separate layer adjusting individual Mi. Do NOT swap inner and outer — this was written incorrectly and corrected.
+6. **Clamped signal amplitude (§3.2):** paper's v_c* = ±1 (unit amplitude, independent of M) — NOT M·sin(φ_c) near zero crossings. The clamped cell clamps at ±1 near the PEAKS of the waveform. Loading power ratio = 4/(πM) (M-dependent), not 4/π. At M=0.78: ratio ≈ 1.63; at M=0.7: ratio ≈ 1.82. Do NOT revert to amplitude-M formula or zero-crossing clamping.
+7. **Fig. 8 explanation:** 1.8 p.u. at large φ is because ratio = 4/(πM) and M=0.7. It is NOT due to non-unity power factor. Large φ → more clamped → higher loading power (not small φ as previously stated incorrectly).
+8. **vg·ig sign convention (§3.4):** vg·ig < 0 = RECTIFIER mode (grid charging cells), NOT "cell delivering to grid". For vg·ig < 0: undercharged → clamped, overcharged → non-clamped. Flipped for vg·ig > 0 (inverter mode).
 
 ## Document Progress
 | Section | Status | Notes |
 |---|---|---|
-| §0 Before You Begin | ✅ Complete | All 6 subsections, buildup figure embedded |
-| §1 The Circuit | ✅ Complete | Paper Fig.1, component walk-through, loading power with governing equations |
-| §2 From Loading Power to Control | ✅ Complete | P_H,i derivation (product-to-sum), Mi* formula, Fig.2 control scheme (outer=voltage, inner=current, balancing=3rd layer) |
-| §3+ | ⏳ Awaiting green signal on §2 | |
+| §1 The CHB Converter | ✅ Written | staircase_buildup + staircase_summation + Fig.1, loading power, balancing problem, symbol table |
+| §2 The Control Architecture | ✅ Written | Fig.2 three-loop walk-through, Fig.3 conventional PI, bandwidth hierarchy, PI limitation |
+| §3 The Proposed Method | ✅ Written | Fig.4 overview, two modes, Fig.7 clamped waveform, loading power derivation, Fig.8 surface, target Mi* |
+| §4 The Sorting Algorithm | ✅ Written | Sign rule, Fig.5 two-cell, Fig.6 four-cell five modes, N-cell summary |
+| §5 Performance | ✅ Written | Figs 9–14 all placed: capability, simulation (3 PF), max perf, prototype, steady state, 13× transient |
 
 ## Key Equations (for continuity across sections)
 - Capacitor energy balance: `C·Vdc,i·dVdc,i/dt = P_i,src - P_H,i`
 - Steady-state condition per cycle k: `P_H,i(k) = P_i,src(k)`
-- Non-clamped loading power: `P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g)`
+- Non-clamped loading power: `P_H,nc = ½·Vdc·M·Ig·cos(φ_g)`
+- Clamped loading power: `P_H,cl = (Vdc·Ig·cos(φ_g)/2π)·[M(π−2φ_c)−M·sin(2φ_c)+4sin(φ_c)]`
+  - At φ_c=π/2 (square wave): `P_H,cl = 2·Vdc·Ig·cos(φ_g)/π`
+  - Ratio: `P_H,cl/P_H,nc = 4/(πM)` at square wave (M-dependent)
 - Modulation index target: `Mi* = 2·P_i,src / (Vdc,i·Ig·cos(φ_g))`
-- Coupling constraint: `Σ Vdc,i·Mi = Vref`
+- Coupling constraint: `Σ Vdc,i·Mi = Vref` (paper Eq. 3: `v_c* + v_nc* = N·v*`)
 - Control loop order (paper Fig. 2): outer = DC voltage → produces Ig*; inner = current control → produces Vref; balancing = per-cell Mi adjustment
+- Paper simulation params: Vg=2kV, Ig=60A, L=1mH, Vdc=600V, M_nom=0.78, fsw=10kHz, fbal=3.6kHz, N=6 cells

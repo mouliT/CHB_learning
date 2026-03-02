@@ -1,7 +1,7 @@
-﻿% ============================================================
+% ============================================================
 %  DC-Link Voltage Balancing Modulation for Cascaded H-Bridge Converters
 %  Paper 3 Reference Notes
-%  Source: [Vasishta et al.], IEEE Access
+%  Source: Ko, Tcai, Liserre, IEEE Access 2021
 %  Figures stored in: figures/
 %  Naming convention: DLVBMCHBC_Fig[N]_page[XX].png  (caption-extracted at 200 DPI)
 % ============================================================
@@ -124,9 +124,8 @@
 % ============================================================
 \title{\textbf{DC-Link Voltage Balancing Modulation}\\[4pt]
        \textbf{for Cascaded H-Bridge Converters}\\[6pt]
-       \large Paper 3 --- Circuit Topology, Control Architecture,\\
-       \large Loading Power Theory, and Sorting Algorithm\\[4pt]
-       \normalsize IEEE Access}
+       \large A Self-Contained Tutorial\\[4pt]
+       \normalsize Ko, Tcai, Liserre --- IEEE Access 2021}
 \date{\today}
 % ============================================================
 
@@ -136,1125 +135,852 @@
 \clearpage
 
 % ============================================================
-\setcounter{section}{-1}
-\section{Before You Begin --- The Big Picture}
-\label{sec:bigpicture}
+\section{The CHB Converter: Circuit, Cascading, and the Balancing Problem}
+\label{sec:circuit}
 % ============================================================
 
-\subsection{What Is This Document?}
+\textit{This section builds the CHB from a single cell upward, shows why cascading
+gives a better waveform, and identifies the core balancing problem that the paper
+solves.}
 
-This document is a self-contained reference guide to the paper:
+The paper studies a
+\textbf{grid-connected cascaded H-bridge (CHB)} converter where each cell has an
+\textbf{isolated DC-link capacitor} and its own DC source.
+Because different sources can deliver different power, the cell voltages naturally
+drift apart unless the controller actively redistributes how much \emph{AC-side power}
+each cell processes.
 
-\begin{center}
-\textit{``DC-Link Voltage Balancing Modulation for Cascaded H-Bridge Converters''}\\
-Y.\,Ko, A.\,Tcai, and M.\,Liserre, \textit{IEEE Access}, 2021.
-\end{center}
+% ── §1.1 ─────────────────────────────────────────────────────────────────
+\subsection{From One Cell to Many: How Cascading Works}
+\label{subsec:cascading}
 
-It walks through every figure, every equation, and every design decision in
-Feynman style --- starting from the simplest possible picture and building up
-to the full algorithm. No derivation is skipped; no equation is left unexplained.
+An H-bridge cell has two ports.
+On the \textbf{DC side}, an isolated capacitor at voltage $\Vdci{i}$ is fed
+by a private source (a PV string, battery, or rectifier) delivering power
+$P_{i,\mathrm{src}}$.
+On the \textbf{AC side}, four transistors chop that DC voltage at carrier
+frequency $f_c \gg f$.
+Averaged over one switching period, the fundamental component of the AC
+output is:
+\[
+    \bar{v}_i(t) = \Vdci{i}\,\Mi\,\sin(\omg t)
+\]
+where $\Mi \in [0,1]$ is the modulation index --- the single knob the
+controller turns to set how much power this cell contributes.
 
-\textbf{What you will understand by the end:}
-\begin{itemize}
-    \item Why a Cascaded H-Bridge (CHB) inverter needs DC-link voltage balancing.
-    \item What ``loading power'' is and why it is the right quantity to control.
-    \item Why clamped modulation is faster than conventional PI control for balancing.
-    \item How to compute the exact modulation parameters to balance any imbalance
-          in minimum time.
-\end{itemize}
+In reality the instantaneous $v_i(t)$ is a high-frequency PWM waveform; in this
+tutorial we use the fundamental component because it is what transfers power to
+the grid at frequency $f$.
 
-\subsection{The Simplest Possible Description of a CHB}
-
-\textbf{Start with a single H-bridge cell.} It has two ports:
-
-\begin{itemize}
-    \item \textbf{DC input port:} an isolated DC-link capacitor at voltage
-          $\Vdci{i}$, continuously replenished by a DC source (a PV string,
-          a battery pack, or a rectifier) delivering power $P_{iH}$.
-          This port does not connect electrically to any other cell.
-    \item \textbf{AC output port:} two terminals that the four transistors
-          switch at high frequency. The average voltage across these terminals
-          over one switching period is $v_i(t) = \Vdci{i} \cdot \Mi\sin(\omg t)$,
-          where $\Mi$ is the modulation index the controller sets.
-\end{itemize}
-
-The H-bridge is therefore a controlled DC-to-AC converter: power flows in
-from an isolated DC source and flows out as a shaped AC voltage.
-
-\medskip
-\textbf{Where exactly does cascading happen?}
-In this paper, $n$ such cells are cascaded by connecting their \emph{AC output
-terminals} in series --- the top terminal of cell~$i$ joins the bottom terminal
-of cell~$(i{+}1)$, forming a single series string. The bottom terminal of the
-lowest cell and the top terminal of the highest cell are the two ends of this
-string. One end connects to the grid through filter inductance $L_f$; the other
-end is the neutral. The same grid current $\ig$ is forced through every cell
-in the string. The DC input ports play no part in the cascading --- they remain
-fully isolated from one another throughout.
-
-\medskip
-The total AC voltage presented to the grid is the series sum of all cell outputs:
+Cascading means connecting the AC output terminals of $n$ cells in
+\emph{series}.
+The same grid current $\ig$ is forced through every cell.
+The total voltage seen by the grid is:
 \[
     \vg(t) = v_1(t) + v_2(t) + \cdots + v_n(t)
 \]
 
-In sinusoidal PWM, each cell's transistors switch at a carrier frequency
-$f_c \gg f$. The instantaneous output of cell $i$ is therefore a PWM waveform
-that alternates rapidly between $+\Vdci{i}$, $0$, and $-\Vdci{i}$ --- not a
-sinusoid. Averaged over one switching period, however, the \textbf{fundamental
-component} of cell $i$'s output is:
-\[
-    \bar{v}_i(t) = \Vdci{i} \cdot \Mi \cdot \sin(\omg t)
-\]
-
-Summing across all $n$ cells, the fundamental component of the total output is:
-\[
-    \bar{\vg}(t) = \left(\sum_{i=1}^{n} \Vdci{i}\,\Mi\right)\sin(\omg t)
-\]
-
-\begin{warningbox}[Three Caveats on This Equation]
-\begin{enumerate}
-    \item \textbf{Fundamental only.} The actual instantaneous $\vg(t)$ contains
-          high-frequency PWM harmonics on top of the sine. These are attenuated
-          --- not eliminated --- by the filter inductance $L_f$.
-    \item \textbf{No per-cell phase offset.} All cells in this paper share the
-          same sinusoidal reference phase. There is no $\theta_i$ offset between
-          cells in the voltage sum.
-    \item \textbf{Linear modulation only.} The relation $\bar{v}_i = \Vdci{i}\Mi\sin(\omg t)$
-          holds only for $\Mi \leq 1$ (non-clamped, linear region). Clamped
-          modulation --- the key contribution of this paper --- modifies this,
-          which is why later sections treat the clamped case separately.
-\end{enumerate}
-\end{warningbox}
-
-\textbf{Why bother stacking?} Each cell's capacitor only needs to support a
-fraction $\Vdci{i}$ of the total bus voltage, so low-voltage, low-cost
-transistors suffice. A 540\,V grid interface is built from three 180\,V cells.
-With sinusoidal PWM and phase-shifted carriers, $n$ cells together produce a
-$(2n{+}1)$-level output; more levels mean lower harmonic distortion and a
-smaller filter $L_f$ --- see \figref{fig:staircase_buildup}.
-
-% TODO: Add a side-by-side n=1..4 comparison figure here (Figure 1).
-%       Requirements: all panels on a normalised y-axis (v / n*Vdc) so the
-%       shrinking orange error region is visually obvious across panels.
-%       Defer until a clean Python figure meeting these criteria is ready.
-
 \figentry{fig:staircase_buildup}{CHB_staircase_buildup}%
     {How three individual H-bridge cell outputs combine to form a
      seven-level multilevel waveform ($n = 3$, $f_c = 12f$, $M = 0.95$).
-     \textbf{Rows 1--3:} each cell's unipolar PWM output (solid coloured
-     line) is shown together with its triangular carrier (grey) and the
-     shared sinusoidal reference $MV_{dc}\sin(\omega t)$ (dashed).
-     Carriers are phase-shifted by $120^\circ$ so that the three cells
-     switch at interleaved instants.
-     \textbf{Row 4 (Sum):} the series sum $v_g = v_1 + v_2 + v_3$
-     steps through seven discrete levels
-     ($0,\,\pm V_{dc},\,\pm 2V_{dc},\,\pm 3V_{dc}$) and closely tracks
-     the ideal sinusoid $3V_{dc}M\sin(\omega t)$ (red dashed line).
-     The orange shading is the residual instantaneous error; the
-     phase-shifted carriers ensure that no two cells switch at the same
-     instant, spreading the transitions evenly and minimising the error.}{1.0}
+     \textbf{Rows 1--3:} each cell's unipolar PWM output (solid colour)
+     with its phase-shifted triangular carrier (grey) and the shared
+     sinusoidal reference (dashed).
+     \textbf{Row 4 (Sum):} the series sum $\vg = v_1 + v_2 + v_3$
+     steps through seven discrete levels and closely tracks the ideal
+     sinusoid $3\Vdc M\sin(\omg t)$ (red dashed).
+     The orange shading is the residual instantaneous error; phase-shifted
+     carriers ensure no two cells switch simultaneously.}{1.0}
 
-\subsection{The Problem in One Sentence}
+\figentry{fig:staircase_summation}{CHB_staircase_summation}%
+    {Effect of increasing the number of cells $n = 1, 2, 3, 4$ on output
+     waveform quality ($f_c = 6f$, $M = 0.95$).
+     Each row shows the total output $\vg$ on a normalised axis
+     $(\vg / n\Vdc)$.
+     With $n = 1$ the output has only 3 levels and large harmonic error
+     (orange shading).
+     Each additional cell doubles the number of levels
+     (3 $\to$ 5 $\to$ 7 $\to$ 9), shrinking the error region visibly.
+     This is why CHB converters dominate high-power applications:
+     more cells means lower harmonic distortion and a smaller filter $L_f$
+     with no increase in individual transistor voltage rating.}{1.0}
 
-\textbf{Every cell shares the same AC current $\ig$, but each cell has its own
-DC source delivering a different amount of power.}
+% ── §1.2 ─────────────────────────────────────────────────────────────────
+\subsection{Full Circuit Topology}
+\label{subsec:topology}
 
-If those source powers are unequal and nothing corrects it, the DC voltages
-$\Vdci{i}$ drift apart. The cell with more input power charges up; the cell
-with less power drains down. Left uncorrected, one cell charges to destruction
-while another discharges to zero.
-
-\medskip
-This is the \emph{normal operating condition} for a CHB connected to:
-\begin{itemize}
-    \item \textbf{Photovoltaic strings}: different panels see different shading.
-    \item \textbf{Battery packs}: cells age at different rates and reach different
-          states of charge.
-    \item \textbf{Power routing systems}: cells deliberately assigned unequal power
-          to extend component lifetime.
-\end{itemize}
-
-Balancing is not an optional add-on --- it is a hard requirement for safe, stable
-operation.
-
-\subsection{What This Paper Proposes --- In One Paragraph}
-
-The conventional fix is a per-cell PI controller that nudges each cell's
-modulation index by a small $\Delta M_i$ each cycle. It works, but the measured
-settling time is $\approx 1850$\,ms (92 grid cycles at 50\,Hz). The PI can
-only make a small correction per cycle, otherwise it distorts the grid current.
-
-\medskip
-This paper asks a different question: \emph{what is the maximum loading power
-this cell can absorb or deliver, given its modulation strategy?} It then
-\textbf{directly sets} the modulation parameters $M_i$ and clamping angle
-$\phic$ to deliver exactly that maximum loading power from cycle one.
-The result: $\approx 140$\,ms settling time --- a factor of $13\times$ faster.
-
-\begin{eqnbox}[The One Number That Matters]
-\[
-    \boxed{13\times \text{ faster:} \quad 1850\,\text{ms}
-           \;\longrightarrow\; 140\,\text{ms}}
-\]
-Both methods reach the same steady-state result --- balanced DC-link voltages
-and sinusoidal grid current. The only difference is \emph{how fast they get
-there}.
-\end{eqnbox}
-
-\subsection{Prerequisites}
-
-This document assumes you are comfortable with:
-\begin{enumerate}
-    \item \textbf{Basic switching converters}: duty cycle, average voltage, PWM.
-          If you understand what a buck converter does, you are ready.
-    \item \textbf{AC circuit analysis}: phasors, power factor, the formula
-          $P = V I \cos\theta$.
-    \item \textbf{PI controllers}: a proportional-integral controller integrates
-          the error and adjusts its output. That is all.
-\end{enumerate}
-
-You do \emph{not} need: advanced state-space control theory, transistor-level
-circuit simulation, or prior knowledge of CHB converters.
-
-\subsection{Quick Symbol Reference}
-
-Every symbol used in this document is defined here. Return to this table whenever
-an equation introduces unfamiliar notation.
-
-\begin{statebox}[Master Symbol Table]
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{p{0.17\linewidth} p{0.40\linewidth} p{0.35\linewidth}}
-\toprule
-\textbf{Symbol} & \textbf{Meaning} & \textbf{Typical Value / Units} \\
-\midrule
-$n$                    & Number of H-bridge cells            & 3 (prototype), 4 (analysis) \\
-$\Vdci{i}$            & DC-link voltage, cell $i$ (= paper's $V_{dc,iH}$) & 180\,V (target each) \\
-$\Vtot$                & Total DC voltage $\sum_i \Vdci{i}$ & $n \times 180$\,V \\
-$\ig$, $\Ig$          & Grid current (inst.\ / amplitude)   & A; same through all cells \\
-$\omg$                 & Grid angular frequency              & $2\pi \times 50$\,rad/s \\
-$\phig$                & Grid power factor angle             & Fixed by load \\
-$L_f$                  & Grid-side filter inductance         & mH \\
-$\Mi$                  & Modulation index, cell $i$          & $0 \leq M_i \leq 1$ \\
-$\phic$                & Clamping half-angle (sine conv.)    & $0$ (sinusoidal) to $\pi/2$ (full square wave); paper Eq.\,6 uses $\varphi=2\phic \in [0,\pi]$ \\
-$\PH$                  & Loading power (net into cap)        & W \\
-$\PHi{i}$             & Loading power, cell $i$ (= paper's $P_{iH}$) & W \\
-$\PHnc$                & Non-clamped loading power           & fn.\ of $\Mi$ only \\
-$\PHcl$                & Clamped loading power               & fn.\ of $\Mi$, $\phic$; ratio $\PHcl/\PHnc = 4/(\pi\Mi)$ at $\phic=\pi/2$ \\
-$P_{i,\mathrm{src}}$  & DC source power, cell $i$ (\emph{doc.\ only; paper uses $\PHi{i}$ for both}) & W; equals $\PHi{i}$ in steady state \\
-\bottomrule
-\end{tabular}
-\end{statebox}
-
-\clearpage
-
-% ============================================================
-\section{The Circuit --- What Is Actually Connected to What?}
-\label{sec:circuit}
-% ============================================================
-
-Section~0 described the CHB in words. This section puts real components
-on the page and names every wire, so that later equations have something
-concrete to refer to.
-
-% ── Fig 1 from the paper ──────────────────────────────────────────────────
 \figentry{fig:paper_fig1}{DLVBMCHBC_Fig1_page01}%
-    {Grid-connected CHB converter with unbalanced loading power
+    {Grid-connected CHB converter with unbalanced loading powers
      $\PHi{1} \neq \PHi{2} \neq \PHi{3}$ (paper Fig.\,1).
      Each H-bridge cell has its own isolated DC-link capacitor fed by an
-     independent DC source. The AC output terminals of all $n$ cells are
-     connected in series; the series string drives the grid through
-     filter inductance $L_f$.}{0.75}
+     independent DC source.
+     The AC output terminals of all $n$ cells are connected in series;
+     the series string drives the grid through filter inductance $L_f$.}{0.75}
 
-\subsection{Reading the Circuit Diagram}
-
-\figref{fig:paper_fig1} shows the complete system. Start at the bottom
-and work upward.
-
-\begin{circuitbox}[Component-by-Component Walk-through]
+\begin{circuitbox}[Component Walk-through (paper Fig.\,1)]
 \begin{enumerate}
     \item \textbf{DC sources (right side of each cell).}
-          Each cell $i$ has its own private DC source --- a PV string,
-          battery pack, or rectifier --- delivering power $P_{i,\mathrm{src}}$
-          and maintaining a DC-link capacitor at voltage $\Vdci{i}$.
-          The dashed isolation boundary in the figure is not decorative:
-          there is \emph{no} electrical path between the DC sides of
+          Each cell $i$ has a private DC source delivering $P_{i,\mathrm{src}}$
+          to its isolated capacitor at $\Vdci{i}$.
+          The dashed isolation boundary is not decorative:
+          there is \emph{no} electrical connection between DC sides of
           different cells.
 
     \item \textbf{H-bridge switches (centre of each cell).}
           Four transistors per cell chop the DC voltage at carrier
-          frequency $f_c$. The average AC voltage produced at the
-          output terminals over one switching period is
-          $\bar{v}_i = \Vdci{i}\Mi\sin(\omg t)$.
+          frequency $f_c$.
+          The average AC output is
+          $\bar{v}_i = \Vdci{i}\,\Mi\,\sin(\omg t)$.
 
     \item \textbf{AC series string (left column).}
-          The AC output terminals are stacked in series:
-          the top terminal of cell~$i$ connects to the bottom terminal
-          of cell~$(i{+}1)$. The total voltage across the string is
-          $\vg = v_1 + v_2 + \cdots + v_n$.
+          The top terminal of cell~$i$ connects to the bottom terminal
+          of cell~$(i{+}1)$.
+          Total output: $\vg = v_1 + \cdots + v_n$.
 
     \item \textbf{Filter inductor $L_f$.}
-          Sits between the AC string and the grid. It attenuates
-          the high-frequency PWM harmonics and forces the grid
-          current $\ig$ to be approximately sinusoidal.
-          Crucially, \emph{the same} $\ig$ flows through every cell
-          in the series string --- there is no way for current to
-          take a different path.
+          Between the AC string and the grid.
+          Attenuates PWM harmonics; forces $\ig$ to be approximately
+          sinusoidal.
+          Crucially, the \emph{same} $\ig$ flows through every cell ---
+          there is no alternative current path.
 
-    \item \textbf{Grid (far left).}
-          Modelled as an ideal sinusoidal voltage source
-          $v_{\mathrm{grid}}(t) = V_{\mathrm{grid}}\sin(\omg t + \phig)$.
-          The grid sets the frequency $\omg$ and the power-factor
-          angle $\phig$; the CHB controls the amplitude and phase of
-          $\vg$ to regulate $\ig$.
+    \item \textbf{Grid.}
+          Modelled as $v_{\mathrm{grid}}(t) = V_{\mathrm{grid}}\sin(\omg t + \phig)$.
+          The grid fixes frequency $\omg$ and power-factor angle $\phig$;
+          the CHB controls amplitude and phase of $\vg$ to regulate $\ig$.
 \end{enumerate}
 \end{circuitbox}
 
-\subsection{The One Quantity That Drives Everything: Loading Power}
+% ── §1.3 ─────────────────────────────────────────────────────────────────
+\subsection{Loading Power and the Capacitor Equation}
 \label{subsec:loading_power}
 
 Because the same current $\ig$ passes through every cell, each cell
-\emph{must} process its share of the AC power whether it likes it or
-not. But each cell also has its own DC source pushing power in from
-the right. The net power that actually charges or discharges the
-DC-link capacitor of cell $i$ is called its \textbf{loading power}:
+\emph{must} process its share of AC power.
+Each cell also has its own DC source pushing power in.
+The net power that charges or discharges the DC-link capacitor of cell $i$
+is its \textbf{loading power}:
 
 \begin{eqnbox}[Definition of Loading Power]
 \[
     \PHi{i} \;=\; \frac{1}{T}\int_{0}^{T} v_i(t)\,\ig(t)\,\mathrm{d}t
 \]
-where $T = 1/f$ is one grid period. This is the average AC power
-\emph{delivered by cell $i$ to the grid} (positive = delivering,
-negative = absorbing). In steady state, $\PHi{i}$ must equal the
-DC source power $P_{i,\mathrm{src}}$ to keep $\Vdci{i}$ constant.
+where $T = 1/f$ is one grid period.
+This is the average AC power \emph{delivered by cell $i$ to the grid}
+(positive = delivering, negative = absorbing).
 \end{eqnbox}
 
-\begin{physbox}[Why ``Loading Power'' and Not Just ``Power''? --- The Governing Equation]
-\textit{Notation note:} The paper uses a single symbol $\PHi{i}$
-(loading power) for both the DC source power and the AC-side average
-power, because they are equal in steady state.  This document
-introduces $P_{i,\mathrm{src}}$ as a shorthand for the instantaneous
-DC source power so that the transient capacitor equation below can
-be written unambiguously.
+The paper calls this quantity the \textbf{cell loading power} (written as $P_{iH}$).
 
-The DC-link capacitor of cell $i$ stores energy
-$E_i = \tfrac{1}{2}C\Vdci{i}^2$.
-Two power flows act on it simultaneously:
-\begin{itemize}
-    \item $P_{i,\mathrm{src}}$ flows \textbf{in} from the DC source.
-    \item $\PHi{i}$ flows \textbf{out} to the AC series string.
-\end{itemize}
-The net rate of energy change is their difference, which by
-$\tfrac{d}{dt}(\tfrac{1}{2}C V^2) = CV\dot{V}$ gives:
+The DC-link capacitor stores energy $E_i = \tfrac{1}{2}C\Vdci{i}^2$.
+Two flows act on it simultaneously: $P_{i,\mathrm{src}}$ in from the DC
+source, and $\PHi{i}$ out to the AC string.
+Their net difference gives the governing equation:
+
+\begin{eqnbox}[Capacitor Energy Balance]
 \[
     C\,\Vdci{i}\,\frac{d\Vdci{i}}{dt}
     \;=\; P_{i,\mathrm{src}} - \PHi{i}
 \]
-Three consequences follow directly from this one equation:
+\end{eqnbox}
+
+\begin{physbox}[Three consequences of this equation]
 \begin{enumerate}
-    \item \textbf{Steady state} ($\dot{V}_{dc,iH} = 0$) requires exactly
-          $\PHi{i} = P_{i,\mathrm{src}}$ --- the AC side must absorb
-          precisely what the DC source supplies.
-    \item \textbf{Overcharging:} if $P_{i,\mathrm{src}} > \PHi{i}$
-          the RHS is positive $\Rightarrow$ $\Vdci{i}$ rises.
-    \item \textbf{Discharging:} if $P_{i,\mathrm{src}} < \PHi{i}$
-          the RHS is negative $\Rightarrow$ $\Vdci{i}$ falls.
+    \item \textbf{Steady state} ($\dot{V}_{dc,iH} = 0$) requires
+          $\PHi{i} = P_{i,\mathrm{src}}$ every grid cycle.
+    \item \textbf{Overcharging:} $P_{i,\mathrm{src}} > \PHi{i}$
+          $\Rightarrow$ $\Vdci{i}$ rises.
+    \item \textbf{Discharging:} $P_{i,\mathrm{src}} < \PHi{i}$
+          $\Rightarrow$ $\Vdci{i}$ falls.
 \end{enumerate}
 This is why the paper focuses entirely on controlling $\PHi{i}$:
-it is the \emph{only} quantity the modulator can manipulate to
-keep $\Vdci{i}$ at its target value.
+it is the only quantity the modulator can set to keep $\Vdci{i}$
+at its target.
 \end{physbox}
 
-\begin{warningbox}[The Key Asymmetry --- and What ``Continuously Corrects'' Means]
-The grid current $\ig$ is \emph{shared} --- it is the same for every
-cell. The DC source powers $P_{i,\mathrm{src}}$ are \emph{independent}
---- they depend on sunlight, battery state of charge, or deliberate
-power routing, and can differ arbitrarily between cells and change
-from one grid cycle to the next.
+% ── §1.4 ─────────────────────────────────────────────────────────────────
+\subsection{The Balancing Problem}
+\label{subsec:problem}
 
-\medskip
-From the capacitor equation derived above, the steady-state condition
-for cell $i$ at grid cycle $k$ is:
-\[
-    \PHi{i}(k) \stackrel{!}{=} P_{i,\mathrm{src}}(k)
-\]
-Substituting the non-clamped loading power expression
-(derived in Section~2):
-\[
-    \underbrace{\tfrac{1}{2}\,\Vdci{i}(k)\,\Mi(k)\,\Ig\cos\phig}_{P_{iH}(k)}
-    \;=\; P_{i,\mathrm{src}}(k)
-\]
-The controller must solve this for $\Mi(k)$ \emph{every grid cycle}
-because $P_{i,\mathrm{src}}(k)$ changes continuously (cloud passing
-over a PV panel, battery charging/discharging). That is what
-``continuously corrects'' means: re-computing and re-applying $\Mi$
-at each cycle $k$ to keep the left-hand side tracking the
-right-hand side despite a moving target. This is the problem the
-paper solves --- and does so $13\times$ faster than a PI controller.
+\begin{warningbox}[Why DC voltages drift --- and why it matters]
+The grid current $\ig$ is \emph{shared} by all cells.
+The DC source powers $P_{i,\mathrm{src}}$ are \emph{independent}:
+they depend on sunlight, battery state of charge, or deliberate power
+routing, and can differ arbitrarily between cells.
+
+If cell~1 receives more source power than cell~2, the only way to
+prevent $\Vdci{1}$ from rising and $\Vdci{2}$ from falling is to
+\emph{make cell~1 deliver more loading power than cell~2}.
+But both cells share the same $\ig$ --- the only freedom is the
+per-cell modulation index $\Mi$.
+
+Left uncontrolled, one cell charges to destruction while another
+discharges to zero. Balancing is therefore a hard requirement, not
+an optional add-on.
 \end{warningbox}
 
-\clearpage
-
-% ============================================================
-\section{From Loading Power to Control}
-\label{sec:loading_power_control}
-% ============================================================
-
-Section~1 introduced loading power $\PHi{i}$ as an integral and stated
-that the controller must set it equal to $P_{i,\mathrm{src}}$ every
-grid cycle.  Before designing any controller we need a \emph{closed-form
-expression} for $\PHi{i}$ --- one that shows clearly which knob
-($\Mi$, later $\phic$) the modulator can turn.
-
-% ── §2.1 ─────────────────────────────────────────────────────────────────
-\subsection{Evaluating the Loading Power Integral}
-\label{subsec:PH_derivation}
-
-The definition from Section~1 is:
-\[
-    \PHi{i} \;=\; \frac{1}{T}\int_{0}^{T} v_i(t)\,\ig(t)\,\mathrm{d}t
-\]
-
-\textbf{Step 1 — Write down the two signals.}
-
-The fundamental component of cell $i$'s output voltage (averaged over
-one switching period, linear modulation):
-\[
-    v_i(t) = \Vdci{i}\,\Mi\,\sin(\omg t)
-\]
-
-The grid current (sinusoidal, lagging the voltage reference by the
-power-factor angle $\phig$):
-\[
-    \ig(t) = \Ig\,\sin(\omg t - \phig)
-\]
-
-\textbf{Step 2 — Substitute into the integral.}
-\[
-    \PHi{i}
-    = \frac{\Vdci{i}\Mi\Ig}{T}
-      \int_{0}^{T} \sin(\omg t)\,\sin(\omg t - \phig)\,\mathrm{d}t
-\]
-
-\textbf{Step 3 — Use the product-to-sum identity.}
-
-$\sin A \sin B = \tfrac{1}{2}[\cos(A-B) - \cos(A+B)]$, so:
-\[
-    \sin(\omg t)\,\sin(\omg t - \phig)
-    = \tfrac{1}{2}\bigl[\cos(\phig) - \cos(2\omg t - \phig)\bigr]
-\]
-
-\textbf{Step 4 — Integrate term by term.}
-
-The $\cos(\phig)$ term is a constant; the $\cos(2\omg t - \phig)$ term
-is a sinusoid at \emph{twice} the grid frequency, whose integral over
-exactly one period $T = 2\pi/\omg$ is zero:
-\[
-    \frac{1}{T}\int_{0}^{T}\cos(2\omg t - \phig)\,\mathrm{d}t = 0
-\]
-
-\textbf{Result --- the non-clamped loading power:}
-
-\begin{eqnbox}[Non-Clamped Loading Power $\PHnc$]
-\[
-    \boxed{
-    \PHi{i}^{\,\mathrm{nc}}
-    \;=\; \frac{1}{2}\,\Vdci{i}\,\Mi\,\Ig\,\cos\phig
-    }
-\]
+This imbalance occurs in every practical CHB application:
 \begin{itemize}
-    \item $\Vdci{i}$ --- DC-link voltage of cell $i$ (state variable,
-          measured each cycle).
-    \item $\Mi$ --- modulation index of cell $i$
-          (\textbf{the control knob}, $0 \leq \Mi \leq 1$).
-    \item $\Ig$ --- grid current amplitude (measured, same for all cells).
-    \item $\cos\phig$ --- grid power factor (fixed by the load/grid).
-\end{itemize}
-This is called \emph{non-clamped} because it assumes linear, unclipped
-sinusoidal modulation.  When the paper introduces clamped modulation in
-Section~4, a second free variable $\phic$ enters and $\PHi{i}$ takes a
-different form.
-\end{eqnbox}
-
-\begin{physbox}[What the Formula Tells You]
-Rearranging for $\Mi$ gives the required modulation index to achieve a
-target loading power $\PHi{i}^{*}$:
-\[
-    \Mi^{*} = \frac{2\,\PHi{i}^{*}}{\Vdci{i}\,\Ig\,\cos\phig}
-\]
-The controller therefore needs to measure three quantities
-($\Vdci{i}$, $\Ig$, $\cos\phig$) and know the target loading power
-$\PHi{i}^{*} = P_{i,\mathrm{src}}$ to compute $\Mi^{*}$ directly ---
-\emph{no iteration, no trial-and-error.}
-The paper exploits this closed form to achieve one-cycle balancing.
-\end{physbox}
-
-% ── §2.2 ─────────────────────────────────────────────────────────────────
-\subsection{The Overall Control Scheme}
-\label{subsec:control_scheme}
-
-\figentry{fig:paper_fig2}{DLVBMCHBC_Fig2_page02}%
-    {Typical control scheme for the grid-connected CHB converter
-     (paper Fig.\,2). An outer DC-link voltage control loop generates
-     the grid-current reference $\ig^{*}$.  An inner current control
-     loop tracks $\ig^{*}$ and produces the common modulation signal.
-     A separate balancing algorithm adjusts each cell's individual
-     modulation index $\Mi$ to keep all DC-link voltages equal at
-     their target $\Vdci{} = \Vtot/n$.}{0.90}
-
-\figref{fig:paper_fig2} shows the two-layer (plus balancing) control
-structure used throughout the paper.
-
-\begin{circuitbox}[Two-Layer Control --- What Each Layer Does]
-\begin{enumerate}
-    \item \textbf{Outer loop --- DC-link voltage control (slow).}
-          Monitors the total DC-link voltage $\sum_i\Vdci{i}$ and
-          drives it to the target $\sum V_{dc,nH}^{*}$.
-          Output: grid-current amplitude reference $\Ig^{*}$.
-
-    \item \textbf{Inner loop --- grid current control (fast).}
-          Tracks $\ig^{*}$ by adjusting the total AC string voltage.
-          Output: common voltage reference $v^{*}$.
-          Must be faster than the outer loop ($t_c \ll t_v$).
-
-    \item \textbf{Balancing algorithm (every grid cycle).}
-          Distributes $v^{*}$ into per-cell references
-          $v_{1H}^{*}, \ldots, v_{nH}^{*}$ so that each
-          $\PHi{i}$ tracks $P_{i,\mathrm{src}}$,
-          subject to $\sum_i v_{iH}^{*} = v^{*}$ at all times.
-\end{enumerate}
-\end{circuitbox}
-
-\begin{physbox}[Signal-by-Signal Tour of Fig.\,2]
-
-\textbf{Outer loop signals.}
-\begin{itemize}
-  \item $\sum V_{dc,nH}^{*}$ (\emph{reference}).
-        Total DC-link voltage setpoint $= n \times V_{dc,H}^{*}$.
-        Set by the system designer --- must exceed the peak grid
-        voltage plus the inductor drop margin.  Fixed in firmware.
-  \item $\sum V_{dc,nH}$ (\emph{measurement}).
-        Sum of all $n$ cell voltages: $V_{dc,1H} + \cdots + V_{dc,nH}$.
-        Each cell has an isolated voltage sensor on its DC-link
-        capacitor; the controller adds the $n$ readings.
-  \item $\ig^{*}$ (\emph{computed reference}).
-        Grid-current \emph{amplitude} produced by the ΣV\textsubscript{DC}
-        PI controller.
-        Intuition: if the total DC voltage rises above target the
-        sources are over-delivering, so export more current (raise
-        $\Ig^{*}$); if it falls, export less (lower $\Ig^{*}$).
-        The actual time-domain reference fed to the inner loop is
-        $\ig^{*}(t) = \Ig^{*}\sin(\omg t - \phig)$;
-        the phase comes from a PLL on $\vg$ (not drawn in Fig.\,2).
-  \item $t_v$: outer-loop PI time constant.
-        Chosen \emph{slow} so the outer loop does not interfere with
-        the faster inner loop.
+    \item \textbf{Photovoltaic strings} --- different panels see
+          different shading.
+    \item \textbf{Battery packs} --- cells age at different rates and
+          reach different states of charge.
+    \item \textbf{Power routing systems} --- cells are deliberately
+          assigned unequal power to extend lifetime.
 \end{itemize}
 
-\textbf{Inner loop signals.}
-\begin{itemize}
-  \item $\ig^{*}$ (\emph{reference}, from outer loop).
-        Instantaneous current reference $= \Ig^{*}\sin(\omg t - \phig)$.
-  \item $\ig$ (\emph{measurement}).
-        Actual grid current measured by a single current sensor
-        (Hall-effect or similar) at the filter inductor $L_f$.
-        Because all $n$ cells are in series, \emph{one sensor captures
-        the current of every cell simultaneously}.
-  \item $v^{*}$ (\emph{computed reference}).
-        Total AC string voltage needed to drive $\ig \to \ig^{*}$,
-        produced by the current controller (typically a PR controller
-        in the stationary frame or a PI in the rotating dq frame).
-        This is a single scalar reference for the \emph{sum} of all
-        cell outputs; it is the balancing block's input.
-  \item $t_c$: inner-loop time constant ($t_c \ll t_v$).
-\end{itemize}
+% ── §1.5 ─────────────────────────────────────────────────────────────────
+\subsection{Symbol Table}
+\label{subsec:symbols}
 
-\textbf{Balancing control signals.}
-\begin{itemize}
-  \item $V_{dc,H}^{*}$ (\emph{reference}, top arrow).
-        Per-cell DC target, derived as $V_{dc,H}^{*} = \sum V_{dc,nH}^{*} / n$
-        from the outer-loop total reference.
-        The value of $\sum V_{dc,nH}^{*}$ is determined by the grid:
-        the total DC bus must satisfy
-        $\sum V_{dc,nH}^{*} \geq \hat{V}_{g} / M_{\mathrm{nom}}$
-        (peak grid voltage divided by the nominal modulation depth),
-        so that the inner loop can always synthesise the required $v^{*}$.
-        This is a \emph{system constraint}, not a free choice.
-        $V_{dc,H}^{*}$ is \textbf{not} computed from the individual
-        source powers $P_{i,\mathrm{src}}$; rather, the source powers
-        are what vary (via $\ig^{*}$) to keep the actual DC voltages
-        tracking this target.
-  \item $V_{dc,1H},\ldots,V_{dc,nH}$ (\emph{measurements}, bottom arrows).
-        Individual cell voltages from the same isolated sensors used
-        by the outer loop.  The balancing algorithm compares each
-        $\Vdci{i}$ to $V_{dc,H}^{*}$ to decide which cells need
-        more loading power and which need less.
-  \item $v^{*}$ (\emph{reference}, from inner loop).
-        The total that the per-cell references must sum to at every
-        instant.  This constraint is non-negotiable: violating it
-        would break the current loop.
-  \item $t_{bal}$ (\emph{update interval}).
-        The balancing algorithm re-runs once per grid cycle
-        ($t_{bal} = T = 1/f = 20\,\text{ms}$ at 50\,Hz).
-  \item $v_{1H}^{*},\ldots,v_{nH}^{*}$ (\emph{outputs}).
-        Individual per-cell modulation references.  The sorting
-        algorithm assigns each cell either clamped or non-clamped
-        mode based on whether $\Vdci{i} > V_{dc,H}^{*}$ or not,
-        choosing the assignment that drives every capacitor voltage
-        toward $V_{dc,H}^{*}$ within the constraint
-        $\sum_i v_{iH}^{*} = v^{*}$.
-\end{itemize}
-
-\end{physbox}
-
-\begin{statebox}[The Constraint the Balancing Algorithm Must Obey]
-The inner current loop demands a total output voltage:
-\[
-    \vg(t) = \sum_{i=1}^{n} \Vdci{i}\,\Mi\,\sin(\omg t)
-           = V_{\mathrm{ref}}\,\sin(\omg t)
-\]
-So any redistribution of $\Mi$ values by the balancing loop must
-satisfy:
-\[
-    \sum_{i=1}^{n} \Vdci{i}\,\Mi \;=\; V_{\mathrm{ref}}
-\]
-This is the \emph{coupling constraint} between the two loops.
-Balancing is not free --- every change to one cell's $\Mi$ forces
-compensating changes in the others to keep the sum fixed.
-\end{statebox}
-
-\clearpage
-
-% ══════════════════════════════════════════════════════════════════════════════
-\section{Two Modulation Strategies --- The Paper's Key Idea}
-\label{sec:two_modes}
-% ══════════════════════════════════════════════════════════════════════════════
-
-We established in \S\ref{sec:loading_power_control} that the balancing algorithm
-adjusts each cell's modulation index $\Mi$ so that its loading power
-$\PHi{i}$ matches its source power $P_{i,\mathrm{src}}$.  But \emph{how
-much correction} can you actually achieve by varying $\Mi$?  This section
-shows why a simple per-cell PI controller is limited, and how the paper
-breaks that limit with a two-mode modulation strategy.
-
-% ── §3.1 ─────────────────────────────────────────────────────────────────────
-\subsection{The Conventional PI Approach and Its Limit}
-\label{subsec:pi_limit}
-
-\figentry{fig:paper_fig3}{DLVBMCHBC_Fig3_page02}%
-    {Conventional PI loop-based voltage balancing algorithm
-     (paper Fig.\,3).  Each cell $i$ has its own PI controller that
-     compares the common DC-link target $V_{dc,H}^{*}$ to the measured
-     voltage $V_{dc,iH}$ and produces a small correction
-     $\Delta v_{iH}^{*}$.  This correction is added to the shared
-     modulation reference $v^{*}$ to give each cell its individual
-     voltage reference $v_{iH}^{*}$.}{0.72}
-
-The conventional approach shown in \figref{fig:paper_fig3} is
-straightforward: if cell $i$ is too high ($V_{dc,iH} > V_{dc,H}^{*}$),
-the PI controller raises $\Delta v_{iH}^{*}$, which increases that
-cell's effective modulation index and therefore its loading power,
-drawing more energy out of its capacitor.
-
-\begin{physbox}[Why PI Correction Has a Hard Ceiling]
-The PI output $\Delta v_{iH}^{*}$ is simply added to a sinusoidal
-reference $v^{*} = V_{\mathrm{ref}}\sin(\omg t)$.  The resulting
-cell reference is still sinusoidal in shape:
-\[
-    v_{iH}^{*}(t) \;=\; (V_{\mathrm{ref}} + \Delta v_{iH}^{*})\,\sin(\omg t)
-\]
-The modulation index is bounded: $M_i \leq 1$ (over-modulation causes
-waveform distortion).  So the maximum extra loading power the PI method
-can deliver is set by how much headroom remains between the current
-$M_i$ and 1.  At high nominal modulation depths (e.g.\ $M = 0.9$),
-that headroom is only 10\,\% --- very little room to push a heavily
-imbalanced cell back in line.
-\end{physbox}
-
-This hard ceiling on achievable correction power is exactly what
-paper Fig.\,9 (covered in a later section) will confirm
-quantitatively.  The question is: can we give the balancing algorithm
-\emph{more} correction range without violating the modulation limit?
-
-% ── §3.2 ─────────────────────────────────────────────────────────────────────
-\subsection{Clamped Modulation --- A New Degree of Freedom}
-\label{subsec:clamped_mode}
-
-% ·· Level-1 intuition ·····················································
-\begin{physbox}[The signals-and-systems root cause: orthogonality]
-\textbf{Step 1 --- Only the fundamental of $v_i$ matters for power.}
-
-The grid current is controlled to be a pure sinusoid:
-$\ig(\theta) = \Ig\sin(\theta - \phig)$.
-The loading power is the inner product of $v_i$ and $\ig$:
-\[
-  \PHi{i}
-  = \frac{1}{2\pi}\int_0^{2\pi} v_i(\theta)\,\ig(\theta)\;d\theta
-\]
-Expand $v_i$ in its Fourier series:
-$v_i = \sum_{n=1}^{\infty} b_n\sin(n\theta + \psi_n)$.
-By the orthogonality of sinusoids, $\int_0^{2\pi}\sin(n\theta)\sin(m\theta)\,d\theta = 0$
-for $n \neq m$.
-Therefore \emph{every harmonic of $v_i$ above the fundamental integrates
-to zero against $\ig$}.  Only the $n=1$ term survives:
-\[
-  \PHi{i} = \tfrac{1}{2}\,b_1\,\Vdc\,\Ig\,\cos\phig
-\]
-where $b_1$ is the \textbf{fundamental Fourier coefficient} of the
-normalised $v_i/\Vdc$.
-
-\medskip
-\textbf{Step 2 --- The paper's clamped signal: amplitude 1, not $M$.}
-
-The coupling constraint $\sum_i \Vdci{i}\Mi = \Vref$ fixes the sinusoidal
-amplitude $M$ per cell for the \emph{non-clamped} cells.  The paper's
-clamped cell, however, is \textbf{not} constrained to amplitude $M$: its
-reference is the unit-amplitude square wave $v_c^* = \mathrm{sign}(\sin\theta)$
-(amplitude $= 1$), independent of $M$.  Its fundamental Fourier coefficient:
-\[
-  b_1^{\,v_c^*} = \frac{4}{\pi} \approx 1.273
-  \qquad \text{(independent of } M\text{)}
-\]
-The sinusoidal non-clamped reference achieves only $b_1^\mathrm{nc} = M$.
-Therefore the \textbf{loading power ratio} is:
-\[
-  \frac{\PHcl}{\PHnc} = \frac{b_1^{\,v_c^*}}{M} = \frac{4}{\pi M}
-\]
-At $M=1$: ratio $= 4/\pi \approx 1.27$ ($+27\%$).  At $M = 0.78$
-(paper's $M_\mathrm{nom}$): ratio $\approx 1.63$ ($+63\%$).
-At $M = 0.7$: ratio $\approx 1.82$ --- exactly what paper Fig.\,8(a)
-shows at the maximum clamping angle.
-
-\medskip
-\textbf{Step 3 --- Why clamped modulation and not always a square wave?}
-
-You may object: the KVL $\vg = \sum_i v_i$ allows any decomposition,
-for instance
-\[
-  \vg \;=\; k_1\,v_{\mathrm{sq},1} + k_2\,v_{\mathrm{sq},2} + \cdots +
-  \Bigl(\vg - \sum_j k_j\,v_{\mathrm{sq},j}\Bigr)
-\]
-With $n$ cells and one coupling constraint
-($\sum_i \Vdci{i}M_i = V_\mathrm{ref}$), there are always $n-1$ free
-loading powers --- and this count does \emph{not} change if some cells
-use square waves.  \textbf{Independence is not actually destroyed.}
-
-The real reason is much simpler: \textbf{range extension}.
-
-\begin{physbox}[The real constraint: maximum achievable loading power per cell]
-With a sinusoidal reference the loading power is fixed at
-\[
-  \PHnc = \tfrac{1}{2}\,\Vdci{i}\,M_i\,\Ig\,\cos\phig
-\]
-and it cannot be increased further by tuning $M_i$ without violating
-the modulation limit.  The conventional PI-based approach (paper
-Fig.\,3) adjusts only $M_i$, so every cell is trapped at the
-sinusoidal ceiling.
-
-From Step~2 we know that a square wave at the same peak amplitude
-achieves $b_1 = 4/\pi \approx 1.273$, delivering 27\% more loading
-power.  This is the highest $b_1$ any waveform bounded by $M\Vdc$
-can achieve.
-
-\begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{lccc}
+\begin{statebox}[Master Symbol Table]
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{0.17\linewidth} p{0.42\linewidth} p{0.33\linewidth}}
 \toprule
-Reference shape & $b_1$ & $\PHi{i}/\PHnc$ at $M{=}1$ & $\PHi{i}/\PHnc$ at $M{=}0.78$ \\\midrule
-Sinusoidal ($\phic = 0$)     & $M$       & $1.00$                  & $1.00$ \\
-Partial clamp ($0<\phic<\pi/2$) & $M$\,--\,$4/\pi$ & $1.00$\,--\,$1.27$ & $1.00$\,--\,$1.63$ \\
-Square wave ($\phic = \pi/2$) & $4/\pi \approx 1.27$ & ${\approx}1.27$ & ${\approx}1.63$ \\
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Typical Value / Units} \\
+\midrule
+$n$                    & Number of H-bridge cells            & 3 (prototype), 4 (analysis) \\
+$\Vdci{i}$            & DC-link voltage, cell $i$           & 600\,V (target each) \\
+$\Vtot$                & Total DC voltage $\sum_i \Vdci{i}$ & $n \times 600$\,V \\
+$\ig$, $\Ig$          & Grid current (inst.\ / amplitude)   & A; same through all cells \\
+$\omg$                 & Grid angular frequency              & $2\pi \times 50$\,rad/s \\
+$\phig$                & Grid power factor angle             & Fixed by load \\
+$L_f$                  & Grid-side filter inductance         & 1\,mH \\
+$\Mi$                  & Modulation index, cell $i$          & $0 \leq M_i \leq 1$; nominal 0.78 \\
+$\phic$                & Clamping half-angle (sine conv.)    & 0 (sinusoidal) to $\pi/2$ (full square wave); paper uses $\varphi = 2\phic$ \\
+$\PH$                  & Loading power (average per cycle)   & W \\
+$\PHi{i}$             & Loading power, cell $i$             & W; equals $P_{i,\mathrm{src}}$ in steady state \\
+$\PHnc$                & Non-clamped loading power           & fn.\ of $\Mi$ only \\
+$\PHcl$                & Clamped loading power               & fn.\ of $\Mi$ and $\phic$ \\
+$P_{i,\mathrm{src}}$  & DC source power, cell $i$           & W \\
+$f_{sw}$               & Switching frequency                 & 10\,kHz \\
+$f_{bal}$              & Balancing update frequency          & 3.6\,kHz \\
 \bottomrule
 \end{tabular}
-\end{center}
-
-Conventional PI balancing is confined to the sinusoidal row.  Clamped
-modulation spans the entire table, letting the algorithm push a cell's
-loading power above its sinusoidal ceiling --- the headroom growing
-as $M$ decreases below 1.
-\end{physbox}
-
-\begin{statebox}[Then why not always command a square wave ($\phic = \pi/2$)?]
-A square wave gives the \emph{maximum} correction, but correction must
-\emph{match} the imbalance.  If a cell's source power exceeds $\PHnc$
-by only 5\%, commanding a full square wave overshoots massively: the
-capacitor voltage swings the wrong way and the balancing loop becomes
-unstable.
-
-The clamp angle $\phic \in [0,\pi/2]$ is the continuously tuneable
-knob that matches correction to imbalance:
-\begin{itemize}
-  \item $\phic = 0$: sinusoidal reference --- same as non-clamped,
-        no correction.
-  \item $\phic = \pi/2$: unit-amplitude square wave --- maximum
-        correction ($+63\%$ at $M=0.78$; $+27\%$ at $M=1$).
-  \item Any $\phic$ in between: a precise intermediate correction
-        sized to the actual imbalance, without overshoot.
-\end{itemize}
-The sorting algorithm (paper Fig.\,4) selects $\phic$ per cell per
-cycle to match each cell's exact imbalance.
 \end{statebox}
-\end{physbox}
-
-% ·· Mode 1 recap ··························································
-\noindent\textbf{Mode 1 --- Non-clamped ($\PHnc$): standard sinusoid.}
-
-The reference is $v_{nc}^{*}(\theta) = M\sin\theta$ for the entire cycle.
-Loading power (derived in \S\ref{subsec:PH_derivation}):
-\[
-    \PHnc \;=\; \tfrac{1}{2}\,\Vdc\,M\,\Ig\,\cos\phig
-\]
-Once $M$ and $\Ig$ are fixed by the control loops, $\PHnc$ is locked.
-\textbf{No free parameter remains.}
-
-% ·· Mode 2 definition ·····················································
-\bigskip
-\noindent\textbf{Mode 2 --- Clamped ($\PHcl$): unit-amplitude square wave
-in phase with the grid.}
-
-\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
-    {Clamped modulation signal (paper Fig.\,7).  The flat segments (clamped
-     regions) sit at $\pm 1$ (the full modulation rail) near the
-     \emph{peaks} and \emph{troughs} of the waveform.  The sinusoidal
-     transitions (solid arcs) follow $M\cos\theta$ in the paper's cosine
-     convention.  Increasing the clamping angle $\varphi$ widens the
-     flat caps; at $\varphi = \pi$ the entire waveform is flat $\Rightarrow$
-     unit-amplitude square wave.}{0.62}
-
-The paper's clamped signal (Eq.\,2) is simply the \emph{sign} of the grid
-voltage:
-
-\begin{eqnbox}[Clamped signal --- paper Eq.\,2]
-\[
-v_c^{*}(\theta) \;=\;
-\begin{cases}
-  +1 & \sin\theta > 0 \quad (\text{positive grid half-cycle}) \\[4pt]
-  -1 & \sin\theta < 0 \quad (\text{negative grid half-cycle})
-\end{cases}
-\]
-Amplitude $= \mathbf{1}$ (the full modulation rail), \textbf{independent of
-the nominal modulation index $M$}.
-\end{eqnbox}
-
-\begin{circuitbox}[Why amplitude 1, not $M$?]
-In the non-clamped case, the cell reference is $v_{nc}^* = M\sin\theta$,
-peaking at $M < 1$.  The clamped cell instead \emph{saturates at $\pm 1$}
-for the entire appropriate half-cycle.  The non-clamped sibling compensates
-(paper Eq.\,3: $v_c^* + v_{nc}^* = N\cdot v^*$), so the grid current
-remains sinusoidal.  Each cell's reference may individually exceed $M$
-or fall below it, as long as the \emph{sum} tracks $N \cdot v^*$.
-\end{circuitbox}
-
-For the \textbf{parametric analysis} of loading power vs.\ clamping angle
-(paper Fig.\,8), the paper (Eq.\,6) generalises to a family parameterised
-by $\phic \in [0,\pi/2]$.  In our sine convention ($\theta=0$ at grid zero
-crossing, peak at $\theta=\pi/2$):
-
-\begin{eqnbox}[Parametric piecewise definition --- $\phic \in [0,\pi/2]$]
-\[
-v_c^{*}(\theta) \;=\;
-\begin{cases}
-  M\sin\theta  & \theta \in [0,\;\pi/2-\phic) \\[4pt]
-  +1           & \theta \in [\pi/2-\phic,\;\pi/2+\phic] \\[4pt]
-  M\sin\theta  & \theta \in (\pi/2+\phic,\;\pi] \\[4pt]
-  M\sin\theta  & \theta \in (\pi,\;3\pi/2-\phic) \\[4pt]
-  -1           & \theta \in [3\pi/2-\phic,\;3\pi/2+\phic] \\[4pt]
-  M\sin\theta  & \theta \in (3\pi/2+\phic,\;2\pi]
-\end{cases}
-\]
-\textbf{Sanity check:} at $\phic = 0$ the flat pieces vanish
-$\Rightarrow$ $v_c^{*} = M\sin\theta$ (sinusoidal, same as non-clamped).
-At $\phic = \pi/2$ the flat pieces cover the entire positive and negative
-half-cycles: $v_c^{*} = +1$ for $\theta\in[0,\pi]$, $-1$ for $\theta\in[\pi,2\pi]$
---- the \textbf{unit-amplitude square wave} of paper Eq.\,2. $\checkmark$
-\end{eqnbox}
-
-\begin{circuitbox}[Reading the piecewise formula piece by piece]
-\begin{enumerate}
-  \item $[0,\, \pi/2-\phic)$: sinusoidal, rising from zero toward the peak.
-
-  \item $[\pi/2-\phic,\; \pi/2+\phic]$: the reference is \emph{frozen at
-        $+1$} (the full positive rail) spanning the positive peak
-        ($\theta=\pi/2$).  Wider $\phic$ $\Rightarrow$ wider flat cap.
-
-  \item $(\pi/2+\phic,\; \pi]$: sinusoidal, descending from the flat cap
-        to the zero crossing.
-
-  \item $(\pi,\; 3\pi/2-\phic)$: sinusoidal, falling into the negative half.
-
-  \item $[3\pi/2-\phic,\; 3\pi/2+\phic]$: frozen at $-1$ (full negative
-        rail), spanning the trough ($\theta=3\pi/2$).
-
-  \item $(3\pi/2+\phic,\; 2\pi]$: sinusoidal, rising back toward zero.
-\end{enumerate}
-At $\phic=\pi/2$ pieces 2 and 5 absorb everything: $v_c^*=\pm1$ everywhere.
-\end{circuitbox}
-
-% ·· Why it increases loading power ········································
-\subsubsection*{Direct power comparison: computing $\PHcl - \PHnc$}
-
-From Step~1 above, loading power equals half the fundamental coefficient
-times $\Vdc\Ig\cos\phig$.  Compute both integrals at unity power factor
-($\phig = 0$, $\ig = \Ig\sin\theta$):
-
-\[
-  \PHnc = \frac{M\Vdc\Ig}{2\pi}\int_0^{2\pi}\sin^2\theta\;d\theta
-        = \frac{M\Vdc\Ig}{2}
-\]
-\[
-  \PHcl
-  \;=\;
-  \frac{\Vdc\Ig}{2\pi}
-  \int_0^{2\pi} v_c^{*}(\theta)\,\sin\theta\;d\theta
-\]
-
-Note: unlike the non-clamped case, $v_c^*$ takes amplitude $1$ (not $M$)
-in its flat regions, so there is \emph{no} prefactor of $M$.
-
-The \emph{difference} $\PHcl - \PHnc$ is non-negative because:
-\begin{itemize}
-  \item In the flat caps near the peaks: $v_c^* = 1 > M\sin\theta$
-        and $\sin\theta \geq 0$, so the integrand is positive.
-  \item In the sinusoidal regions: $v_c^* = M\sin\theta$, difference
-        is zero.
-  \item Negative half-cycle: by odd symmetry both factors flip sign;
-        product stays non-negative.
-\end{itemize}
-Therefore $\PHcl \geq \PHnc$ for all $\phic \geq 0$.
-
-Breaking over the positive half-cycle (negative half contributes equally
-by symmetry), let $\alpha = \pi/2 - \phic$:
-\[
-  \frac{1}{2}\int_0^{2\pi} v_c^{*}\sin\theta\;d\theta
-  \;=\;
-  \underbrace{2M\!\int_0^{\pi/2-\phic}\!\sin^2\!\theta\;d\theta}_{%
-    \text{sinusoidal tails (two pieces per half)}}
-  \;+\;
-  \underbrace{\int_{\pi/2-\phic}^{\pi/2+\phic}\!\sin\theta\;d\theta}_{%
-    \text{flat cap at peak}}
-\]
-
-Evaluating each group:
-\begin{align*}
-  2M\!\int_0^{\pi/2-\phic}\!\sin^2\!\theta\;d\theta
-    &= M\!\left(\frac{\pi}{2}-\phic\right) - \frac{M}{2}\sin 2\phic \\[6pt]
-  \int_{\pi/2-\phic}^{\pi/2+\phic}\!\sin\theta\;d\theta
-    &= 2\sin\phic
-\end{align*}
-
-(The second result follows from $\int_{\pi/2-\phic}^{\pi/2+\phic}\sin\theta\,d\theta
-= [-\cos\theta]_{\pi/2-\phic}^{\pi/2+\phic} = \sin\phic + \sin\phic = 2\sin\phic$.)
-
-Combining both half-cycles:
-\[
-  \int_0^{2\pi} v_c^{*}\sin\theta\;d\theta
-  \;=\; M(\pi - 2\phic) - M\sin 2\phic + 4\sin\phic
-\]
-
-\begin{eqnbox}[Clamped loading power --- closed form]
-\[
-  \boxed{
-    \PHcl
-    \;=\;
-    \frac{\Vdc\Ig\cos\phig}{2\pi}
-    \Bigl[M(\pi - 2\phic) - M\sin 2\phic + 4\sin\phic\Bigr]
-  }
-\]
-(The $\cos\phig$ factor reinstates general power factor.)  Dividing by
-$\PHnc = \tfrac{1}{2}M\Vdc\Ig\cos\phig$:
-\[
-  \frac{\PHcl}{\PHnc}
-  \;=\;
-  \frac{M(\pi - 2\phic) - M\sin 2\phic + 4\sin\phic}{\pi M}
-\]
-This ratio \textbf{depends on $M$}: for $\phic = \pi/2$ it equals
-$4/(\pi M)$, reaching ${\approx}1.63$ at $M = 0.78$ (paper's $M_\mathrm{nom}$)
-and ${\approx}1.82$ at $M = 0.7$ --- exactly matching paper Fig.\,8.
-\end{eqnbox}
-
-\begin{statebox}[Power ratio at unity PF for two representative $M$ values]
-\centering
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{cccc}
-\hline
-$\phic$ & $\PHcl/\PHnc$ at $M=1.0$ & $\PHcl/\PHnc$ at $M=0.78$ & Comment \\
-\hline
-$0^{\circ}$  & 1.000 & 1.000 & No clamping --- sinusoidal \\
-$30^{\circ}$ & 1.097 & 1.207 & Narrow flat cap near peaks \\
-$60^{\circ}$ & 1.209 & 1.472 & Wider flat cap \\
-$90^{\circ}$ & $4/\pi \approx 1.273$ & $4/(0.78\pi) \approx 1.634$ & Full square wave \\
-\hline
-\end{tabular}
-
-\smallskip
-\raggedright
-At $\phic = 90^{\circ}$ the clamped signal is the unit-amplitude square wave
-($v_c^{*} = \mathrm{sign}(\sin\theta)$, amplitude $= 1$, not $M$), whose
-fundamental Fourier coefficient is $4/\pi$.  The ratio $4/(\pi M)$ exceeds
-$4/\pi$ whenever $M < 1$, which is why paper Fig.\,8 reaches ${\approx}1.8$
-p.u.\ at $M = 0.7$ even at unity power factor.
-\end{statebox}
-
-% ·· Fourier argument ······················································
-\subsubsection*{Why is reshaping the waveform acceptable?}
-
-The clamped waveform is \emph{not} a pure sinusoid, so why does the grid
-not object?  The Fourier series answers this.
-
-\begin{physbox}[Fourier view of the clamped signal]
-Any periodic odd waveform with half-wave symmetry expands as:
-\[
-  v_c^{*}(\theta)
-  \;=\;
-  \sum_{\substack{n=1,3,5,\ldots}} b_n \sin(n\theta)
-\]
-Only odd harmonics appear.  The fundamental coefficient follows directly
-from the loading power formula above:
-\[
-  b_1 = \frac{M(\pi-2\phic) - M\sin 2\phic + 4\sin\phic}{\pi}
-  \;>\; M \quad\text{for } \phic > 0
-\]
-(Equal to $M$ at $\phic=0$; at $\phic=\pi/2$: $b_1 = 4/\pi \approx 1.273$.)
-
-Higher harmonics ($n = 3, 5, 7, \ldots$) are present but attenuated:
-\begin{itemize}
-  \item The $n$-th harmonic has voltage amplitude $\sim b_n \Vdc$.
-  \item The filter inductance $L_f$ presents impedance $n\omg L_f$ to
-        the $n$-th harmonic.
-  \item The resulting harmonic current $\sim b_n\Vdc / (n\omg L_f)$
-        falls off as $1/n$.
-  \item Harmonic power $\sim (b_n)^2/n^2$ falls off as $1/n^2$.
-\end{itemize}
-At $\phic = 90^{\circ}$ (unit-amplitude square wave) the spectrum is
-$b_n = 4/(n\pi)$, so the 3rd harmonic current is $1/3$ and its power
-is $1/9$ of the fundamental.  The H-bridge already produces PWM switching
-harmonics at $f_c = 12f$ (and multiples) that $L_f$ is designed to block.
-The clamping harmonics at $3f, 5f, \ldots$ lie well below $f_c$ but are
-also suppressed by $L_f$, keeping the grid-current THD within code limits.
-
-\textbf{Crucially}: only the fundamental $b_1\sin\theta$ overlaps with
-$\ig = \Ig\sin\theta$ and therefore contributes to real power transfer.
-The harmonics are reactive and filtered.  The balancing algorithm exploits
-exactly this: it raises $b_1 > M$ by clamping (momentarily touching
-amplitude $1 > M$ at the peaks), thereby transferring more real power
-per cycle without changing the current-controller setpoint $M$.
-\end{physbox}
-
-\begin{warningbox}[$\phic$ and $M$ are independent knobs]
-Changing $M$ scales the sinusoidal amplitude uniformly --- the waveform
-shape is unchanged.  Changing $\phic$ \emph{reshapes} the waveform: it
-replaces the sinusoidal peaks with flat caps at $\pm 1$ (wider for larger
-$\phic$), while the sinusoidal tails are unaffected.  In the paper, $M$
-is fixed globally by the outer voltage and inner current loops; $\phic$
-is what the balancing algorithm tunes \emph{independently per cell}.
-\end{warningbox}
-
-% ── §3.3 ─────────────────────────────────────────────────────────────────────
-\subsection{How Clamping Changes Loading Power}
-\label{subsec:loading_power_surfaces}
-
-\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
-    {Loading power as a function of nominal modulation index $M$ and
-     clamping angle $\varphi \in [0^{\circ},180^{\circ}]$ (paper Fig.\,8).
-     (a)~Clamped mode: the surface rises from $1$\,p.u.\ at $\varphi=0$
-     (sinusoidal, no clamping) up to ${\approx}1.8$\,p.u.\ at
-     $\varphi=180^{\circ}$ (full square wave, $M=0.7$).
-     (b)~Non-clamped mode: the surface dips from $1$\,p.u.\ at
-     $\varphi=0$ down to ${\approx}0.18$\,p.u.\ at $\varphi=180^{\circ}$,
-     since the compensating non-clamped cell must reduce its reference
-     as the clamped cell's reference grows.}{0.88}
-
-\figref{fig:paper_fig8} is the quantitative payoff.  Compare the two
-panels side by side:
-
-\begin{statebox}[Reading the Loading Power Surfaces]
-\begin{itemize}
-    \item \textbf{Clamped (left panel):} the surface climbs from
-          ${\approx}1$\,p.u.\ ($\varphi \to 0$, barely clamped,
-          near sinusoid) up to ${\approx}1.8$\,p.u.\ ($\varphi=180^{\circ}$,
-          heavily clamped, unit-amplitude square wave).  The gain over
-          the sinusoidal baseline $= 4/(\pi M)$, which is larger when
-          $M$ is small.  By choosing $\varphi$, the algorithm can push
-          a cell's loading power well above the sinusoidal ceiling.
-
-    \item \textbf{Non-clamped (right panel):} the surface is near
-          $1$\,p.u.\ at $\varphi=0$ but \emph{falls} as $\varphi$
-          increases (down to ${\approx}0.18$\,p.u.\ at $M=0.7$,
-          $\varphi=180^{\circ}$).  This is because the non-clamped
-          sibling must reduce its reference (paper Eq.\,3) to compensate
-          for the clamped cell's boosted output.  In contrast to the
-          clamped cell, it has no direct freedom to raise loading power.
-
-    \item \textbf{The balancing idea in one sentence:}
-          assign clamped mode to cells that need to deliver \emph{more}
-          loading power (overcharged in inverter mode, undercharged in
-          rectifier mode), and non-clamped mode to the others.
-          The next section shows exactly how the algorithm decides
-          which cell gets which mode.
-\end{itemize}
-\end{statebox}
-
-% ── §3.4 ─────────────────────────────────────────────────────────────────────
-\subsection{Overview: How the Two Modes Are Assigned}
-\label{subsec:algorithm_overview}
-
-\figentry{fig:paper_fig4}{DLVBMCHBC_Fig4_page03}%
-    {Principle of the proposed method (paper Fig.\,4).  All measured
-     DC-link voltages $V_{dc,iH}$ are fed into a sorting algorithm
-     together with the reference $V_{dc,H}^{*}$.  The sorted list
-     places the reference somewhere in the middle.  Cells ranked
-     above the reference receive one modulation mode; cells ranked
-     below receive the other.  Which mode goes to which group flips
-     depending on the sign of $\vg\cdot\ig$ (power flow direction).}{0.72}
-
-Now that we have the two tools (non-clamped and clamped), the question
-is: which cell gets which mode at any given moment?
-\figref{fig:paper_fig4} shows the answer in one diagram.
-
-\begin{circuitbox}[The Assignment Rule in Three Steps]
-\begin{enumerate}
-    \item \textbf{Measure.}  Sample all DC-link voltages
-          $V_{dc,1H},\,V_{dc,2H},\,\ldots,\,V_{dc,nH}$ and the
-          reference $V_{dc,H}^{*}$.
-
-    \item \textbf{Sort.}  Rank all voltages in descending order and
-          locate where $V_{dc,H}^{*}$ falls in the list:
-          \[
-              V_{dc,1H} \;>\; V_{dc,2H} \;>\; \cdots \;>\;
-              \underbrace{V_{dc,H}^{*}}_{\text{reference}} \;>\;
-              \cdots \;>\; V_{dc,nH}
-          \]
-          Cells \emph{above} the reference are overcharged
-          ($V_{dc,iH} > V_{dc,H}^{*}$) and need to shed more energy.
-          Cells \emph{below} are undercharged or on-target.
-
-    \item \textbf{Assign.}  The sign of the instantaneous power
-          $\vg\cdot\ig$ tells us whether the grid is absorbing or
-          delivering energy right now:
-          \begin{itemize}
-              \item If $\vg\cdot\ig < 0$ (rectifier mode --- grid
-                    charging the cells): undercharged cells get
-                    \emph{clamped} ($v_c^{*}$, absorbs more);
-                    overcharged cells get \emph{non-clamped}
-                    ($v_{nc}^{*}$, absorbs less).
-              \item If $\vg\cdot\ig > 0$ (inverter mode --- cells
-                    delivering to grid): the assignment flips ---
-                    overcharged cells get \emph{clamped} (delivers
-                    more, discharges faster); undercharged cells get
-                    \emph{non-clamped}.
-          \end{itemize}
-          The flip ensures that regardless of power flow direction,
-          the overcharged cell always ends up with higher loading
-          power (discharging its capacitor) and the undercharged
-          cell gets lower loading power (allowing its capacitor to
-          charge).
-\end{enumerate}
-\end{circuitbox}
-
-The full worked case study (two cells, four time regions) and the
-generalisation to $n$ cells (five possible positions of $V_{dc,H}^{*}$
-in a four-cell sorted list) are treated in the next section.
 
 \clearpage
+
+% ============================================================
+\section{The Control Architecture: Three Loops}
+\label{sec:control}
+% ============================================================
+
+\textit{This section shows the complete control picture in one place --- the three
+nested loops that govern the CHB --- and then explains the conventional PI
+balancing method and why it is slow.}
+
+% ── §2.1 ─────────────────────────────────────────────────────────────────
+\subsection{The Three-Layer Control Scheme}
+\label{subsec:three_loops}
+
+\figentry{fig:paper_fig2}{DLVBMCHBC_Fig2_page02}%
+    {Three-layer control scheme for the grid-connected CHB converter
+     (paper Fig.\,2).
+     \textbf{Outer loop (DC-link voltage control, slow):} compares the
+     average DC-link voltage to its reference and generates the grid
+     current reference $\ig^{*}$.
+     \textbf{Inner loop (grid current control, fast):} forces the actual
+     grid current to track $\ig^{*}$ and produces the total voltage
+     reference $\vref$.
+     \textbf{Balancing layer (per-cell):} divides $\vref$ among the $n$
+     cells by computing individual modulation indices $M_i$ (and clamping
+     angles $\phic$ in the proposed method).}{0.9}
+
+\begin{circuitbox}[Three-Layer Walk-through (paper Fig.\,2)]
+\begin{enumerate}
+    \item \textbf{Outer loop --- DC-link voltage control (slow).}
+          Measures the average DC-link voltage
+          $\bar{V}_{dc} = \frac{1}{n}\sum_i \Vdci{i}$,
+          compares it to the reference $V_{dc}^{*}$, and passes the error
+          through a PI controller.
+          Output: grid current reference $\Ig^{*}$.
+          This loop is slow (bandwidth $\approx f_{bal}$) because it
+          must not disturb the inner current loop.
+
+    \item \textbf{Inner loop --- grid current control (fast).}
+          Measures the actual grid current $\ig$, compares it to $\Ig^{*}$,
+          and passes the error through another PI (or resonant) controller.
+          Output: total voltage reference $\vref$.
+          This loop is fast (bandwidth $\gg f$) to achieve low current THD.
+
+    \item \textbf{Balancing layer --- per-cell modulation.}
+          Takes $\vref$ and the measured individual voltages $\Vdci{i}$,
+          and computes a per-cell output reference $v_{iH}^{*}$ for each cell.
+          In the conventional method this is done with per-cell PI
+          controllers (paper Fig.\,3).
+          In the proposed method it is done by the sorting algorithm
+          with clamped/non-clamped modulation (Sections~\ref{sec:proposed}
+          and~\ref{sec:algorithm}).
+\end{enumerate}
+\end{circuitbox}
+
+The key constraint linking all three layers is the \emph{coupling constraint}:
+all cells share the same $\ig$, so their voltage references must sum to $\vref$:
+
+\begin{eqnbox}[Coupling Constraint]
+\[
+    \sum_{i=1}^{n} v_{iH}^{*} \;=\; \vref
+    \qquad
+    \Longleftrightarrow
+    \qquad
+    \sum_{i=1}^{n} \Vdci{i}\,\Mi \;=\; \vref
+\]
+Any increase in one cell's $\Mi$ must be compensated by decreases in
+the others, or the total voltage reference is violated.
+This coupling is what makes balancing non-trivial.
+\end{eqnbox}
+
+% ── §2.2 ─────────────────────────────────────────────────────────────────
+\subsection{Conventional PI Balancing --- The Method This Paper Replaces}
+\label{subsec:conventional_pi}
+
+\figentry{fig:paper_fig3}{DLVBMCHBC_Fig3_page02}%
+    {Conventional PI-based DC-link voltage balancing (paper Fig.\,3).
+     Each cell $i$ has a dedicated PI controller that compares
+     $\Vdci{i}$ to the average voltage $\bar{V}_{dc}$ and adds a
+     correction $\Delta v_{iH}$ to the shared voltage reference $\vref$,
+     giving a per-cell reference $v_{iH}^{*} = \vref + \Delta v_{iH}$.
+     All $n$ correction terms must sum to zero to satisfy the coupling
+     constraint.}{0.9}
+
+\begin{circuitbox}[How Conventional PI Balancing Works]
+Each cell runs an independent PI loop:
+\[
+    v_{iH}^{*}(k) \;=\; \vref(k) \;+\; \Delta v_{iH}(k)
+\]
+where $\Delta v_{iH}$ is proportional-plus-integral of the individual
+voltage error $(\Vdci{i} - \bar{V}_{dc})$.
+
+The controller must respect the coupling constraint
+$\sum_i \Delta v_{iH} = 0$: if one cell's correction increases,
+another's must decrease by the same amount.
+\end{circuitbox}
+
+\textbf{Why it is slow.}
+The PI bandwidth cannot be set freely.
+There is a strict hierarchy of time constants:
+\[
+    t_{sw} \;\ll\; t_{c} \;\ll\; t_{v} \;\ll\; t_{bal}
+\]
+where $t_{sw}$ is the switching period, $t_c$ the current-loop bandwidth,
+$t_v$ the voltage-loop bandwidth, and $t_{bal}$ the balancing settling time.
+The balancing loop must be \emph{slower} than the voltage loop to avoid
+destabilising it.
+This intrinsic hierarchy means the PI controller can only correct a tiny
+fraction of the voltage imbalance each grid cycle.
+Result: settling time $\approx 1850$\,ms (92 grid cycles at 50\,Hz).
+
+\begin{warningbox}[The fundamental limitation of PI balancing]
+The PI adds a small $\Delta v_{iH}$ each cycle.
+The maximum step size is limited by the requirement not to distort the
+grid current.
+No matter how aggressively the gains are tuned, the settling time is
+bounded below by the bandwidth hierarchy.
+This is the limitation the paper overcomes --- not by better PI tuning,
+but by replacing the architecture entirely.
+\end{warningbox}
+
+\clearpage
+
+% ============================================================
+\section{The Proposed Method: Modulation-Based Balancing}
+\label{sec:proposed}
+% ============================================================
+
+\textit{This section introduces the paper's key idea: instead of nudging modulation
+indices by small increments, shape the modulation waveform itself to access a
+wider range of loading power --- then solve directly for the waveform parameters
+that achieve exact balance in one balancing period.}
+
+% ── §3.1 ─────────────────────────────────────────────────────────────────
+\subsection{The Big Picture: Algorithm Overview}
+\label{subsec:algo_overview}
+
+\figentry{fig:paper_fig4}{DLVBMCHBC_Fig4_page03}%
+    {Overview of the proposed modulation-based balancing algorithm
+     (paper Fig.\,4).
+     Each balancing period, the algorithm:
+     (1) ranks all $n$ cells by measured DC-link voltage $\Vdci{i}$,
+     (2) assigns each cell either \emph{clamped} or \emph{non-clamped}
+         modulation based on sign of $\vg\ig$ and rank,
+     (3) computes the clamping angle $\phic$ and modulation index $\Mi^{*}$
+         to achieve the exact target loading power $\PHi{i} = P_{i,\mathrm{src}}$.
+     The sorting and assignment rules are detailed in
+     Section~\ref{sec:algorithm}.}{0.9}
+
+The algorithm assigns one of two modulation modes to each cell every
+balancing period.
+Understanding both modes --- and their different loading power
+capabilities --- is the key to understanding the whole paper.
+
+% ── §3.2 ─────────────────────────────────────────────────────────────────
+\subsection{Two Modulation Modes}
+\label{subsec:two_modes}
+
+\textbf{Non-clamped mode.}
+Standard sinusoidal modulation:
+\[
+    v_{nc}^{*}(\theta) \;=\; \Mi\,\sin(\theta), \quad \theta = \omg t
+\]
+Amplitude is $\Mi \leq 1$.
+The waveform tracks the sinusoid at all times.
+
+\textbf{Clamped mode.}
+The reference is held (``clamped'') at $\pm 1$ for an interval of
+$2\phic$ centred on each peak, and follows a sinusoid elsewhere:
+
+\begin{eqnbox}[Clamped Reference Waveform (paper Eq.\,2)]
+\[
+    v_{c}^{*}(\theta) \;=\;
+    \begin{cases}
+        +1          & \text{if } \sin\theta \geq \cos\phic \text{ (near positive peak)} \\
+        \Mi\sin\theta & \text{if } |\sin\theta| < \cos\phic \text{ (middle region)} \\
+        -1          & \text{if } \sin\theta \leq -\cos\phic \text{ (near negative peak)}
+    \end{cases}
+\]
+where $\phic \in [0, \pi/2]$ is the \emph{clamping half-angle}
+(sine convention used in this document; paper Eq.\,6 uses
+$\varphi = 2\phic \in [0,\pi]$, cosine convention).
+\end{eqnbox}
+
+Key points about the clamped waveform:
+\begin{itemize}
+    \item The flat regions are at the \textbf{peaks} ($\pm 1$), not near
+          the zero crossings.
+          The cell is clamped to maximum output when the grid current
+          is largest --- exactly when it can deliver the most power.
+    \item The amplitude of the flat region is \textbf{1} (unit),
+          independent of $\Mi$.
+          This is what gives the clamped cell extra loading power
+          beyond what sinusoidal modulation at index $\Mi$ would provide.
+    \item At $\phic = 0$: no clamping, standard sinusoid.
+          At $\phic = \pi/2$: fully clamped (square wave at $\pm 1$).
+\end{itemize}
+
+\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
+    {Clamped modulation reference signal with clamping half-angle $\phic$
+     (paper Fig.\,7).
+     The waveform is held at $\pm 1$ for $2\phic$ centred on each peak.
+     Outside the clamped intervals the reference is sinusoidal with
+     modulation index $\Mi$.
+     The shaded regions show where the clamping is active.
+     Increasing $\phic$ extends the clamped interval, reducing $\Mi$
+     required to satisfy the coupling constraint and increasing the
+     loading power extracted from this cell.}{0.85}
+
+% ── §3.3 ─────────────────────────────────────────────────────────────────
+\subsection{Loading Power of Each Mode}
+\label{subsec:loading_power_derivation}
+
+\textbf{Non-clamped result.}
+With $v_i(t) = \Vdci{i}\,\Mi\,\sin\theta$ and
+$\ig(t) = \Ig\,\sin(\theta - \phig)$, the product-to-sum identity
+gives immediately:
+
+\begin{eqnbox}[Non-Clamped Loading Power]
+\[
+    \PHnc \;=\; \frac{1}{2}\,\Vdci{i}\,\Mi\,\Ig\,\cos\phig
+\]
+The only control variable is $\Mi \in [0,1]$.
+Maximum achievable: $\PHnc^{\max} = \frac{1}{2}\,\Vdci{i}\,\Ig\,\cos\phig$
+at $\Mi = 1$.
+\end{eqnbox}
+
+\textbf{Clamped result.}
+The clamped waveform has a piecewise form, so the loading power integral
+must be evaluated in pieces.
+The calculation splits the period into three intervals: the two clamped
+intervals near the peaks, and the sinusoidal middle region.
+The result is (paper Eq.\,6):
+
+\begin{eqnbox}[Clamped Loading Power]
+\[
+    \PHcl \;=\; \frac{\Vdci{i}\,\Ig\,\cos\phig}{2\pi}
+    \Bigl[
+        \Mi(\pi - 2\phic) - \Mi\sin(2\phic) + 4\sin(\phic)
+    \Bigr]
+\]
+Two free variables: $\Mi$ and $\phic$.
+\end{eqnbox}
+
+\textbf{The ratio at full clamping ($\phic = \pi/2$, square wave):}
+\[
+    \frac{\PHcl}{\PHnc}\bigg|_{\phic = \pi/2}
+    \;=\; \frac{4}{\pi \Mi}
+\]
+At nominal $\Mi = 0.78$: ratio $\approx 1.63$.
+At $\Mi = 0.70$: ratio $\approx 1.82$.
+The ratio is \textbf{$\Mi$-dependent} --- lower $\Mi$ gives a larger
+ratio, which is why the paper's maximum imbalance capability surface
+rises at low $\Mi$ values.
+
+\begin{physbox}[Why clamping extracts more power]
+In non-clamped mode, the cell voltage near the peaks is $\Vdci{i}\Mi\sin\theta < \Vdci{i}$.
+In clamped mode, it is held at $\Vdci{i}$ (the full DC-link voltage).
+The grid current $\ig$ is largest near the peaks.
+Power = voltage $\times$ current.
+By clamping at unit amplitude exactly when the current is high,
+the clamped cell delivers significantly more power per cycle than a
+purely sinusoidal cell with the same nominal $\Mi$.
+\end{physbox}
+
+% ── §3.4 ─────────────────────────────────────────────────────────────────
+\subsection{The Loading Power Surface}
+\label{subsec:loading_power_surface}
+
+\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
+    {Loading power surfaces normalised to the non-clamped base case
+     (paper Fig.\,8).
+     \textbf{Left (clamped surface):} $\PHcl / \PHnc^{0}$ as a function of
+     modulation index $\Mi$ and clamping half-angle $\phic$.
+     At small $\phic$ (little clamping) the surface approaches 1.0 p.u.;
+     at large $\phic$ and low $\Mi$ it reaches $\approx 1.82$ p.u.
+     The ridge at large $\phic$ is where the ratio $4/(\pi\Mi)$ peaks.
+     \textbf{Right (non-clamped surface):} $\PHnc / \PHnc^{0}$ as a function
+     of $\Mi$ and $\phic$.
+     This surface \emph{falls} as $\phic$ increases, reaching $\approx 0.18$
+     p.u.\ at $(\Mi=0.7, \phic=\pi/2)$, because when one cell is clamped
+     the others must reduce their modulation indices to satisfy the coupling
+     constraint --- they give up power to compensate.
+     The gap between the two surfaces is the range of power redistribution
+     the algorithm exploits.}{0.95}
+
+The key insight from \figref{fig:paper_fig8}:
+
+\begin{statebox}[What the loading power surface means for balancing]
+\begin{itemize}
+    \item \textbf{Clamped cell} can absorb/deliver up to 1.82$\times$ the
+          ``normal'' loading power at full clamping.
+    \item \textbf{Non-clamped cells} drop to as low as 0.18$\times$ normal
+          power when compensating.
+    \item The \textbf{ratio between the two} is what enables rapid balancing:
+          the algorithm can move large amounts of power between cells in a
+          single balancing period, not just tiny increments.
+    \item The conventional PI method is limited to small $\Delta M_i$
+          corrections; the proposed method can use the full width of this surface.
+\end{itemize}
+\end{statebox}
+
+% ── §3.5 ─────────────────────────────────────────────────────────────────
+\subsection{Target Modulation Index}
+\label{subsec:target_Mi}
+
+Given the closed-form expressions for loading power, the controller can
+\emph{invert} them to solve directly for the modulation parameters that
+achieve balance.
+
+For a non-clamped cell, setting $\PHnc = P_{i,\mathrm{src}}$ and
+solving for $\Mi^{*}$:
+
+\begin{eqnbox}[Target Modulation Index (Non-Clamped)]
+\[
+    \Mi^{*} \;=\; \frac{2\,P_{i,\mathrm{src}}}{\Vdci{i}\,\Ig\,\cos\phig}
+\]
+This is exact --- no iteration required.
+The controller measures $\Vdci{i}$, $\Ig$, $\cos\phig$, and knows
+$P_{i,\mathrm{src}}$ (estimated from DC source measurements).
+\end{eqnbox}
+
+For a clamped cell, both $\Mi$ and $\phic$ are free variables.
+The algorithm fixes $\Mi$ from the coupling constraint
+($\sum_i \Vdci{i}\,\Mi = \vref$) and solves for $\phic$ to hit the
+target loading power.
+The exact clamped-cell solution is detailed in Section~\ref{sec:algorithm}.
+
+\clearpage
+
+% ============================================================
+\section{The Sorting Algorithm}
+\label{sec:algorithm}
+% ============================================================
+
+\textit{This section shows exactly how the algorithm runs each balancing period:
+which cell gets clamped, how the sign of grid power determines the direction,
+and how the assignment extends from two cells to $N$ cells.}
+
+% ── §4.1 ─────────────────────────────────────────────────────────────────
+\subsection{Sorting Principle and Sign Rule}
+\label{subsec:sorting}
+
+At each balancing period, the algorithm:
+\begin{enumerate}
+    \item Measures all DC-link voltages $\Vdci{i}$.
+    \item Computes the sign of the instantaneous grid power $\vg\ig$
+          to determine whether the CHB is in rectifier or inverter mode.
+    \item Ranks cells by $\Vdci{i}$ and assigns modes based on rank and sign.
+\end{enumerate}
+
+\begin{statebox}[Sign Rule for Mode Assignment]
+\textbf{Inverter mode} ($\vg\ig > 0$, CHB delivering power to grid):
+\begin{itemize}
+    \item Cells with \emph{high} $\Vdci{i}$ (overcharged)
+          $\to$ \textbf{clamped} (deliver more power, discharge faster).
+    \item Cells with \emph{low} $\Vdci{i}$ (undercharged)
+          $\to$ \textbf{non-clamped} (deliver less power, recover slower).
+\end{itemize}
+
+\textbf{Rectifier mode} ($\vg\ig < 0$, CHB absorbing power from grid):
+\begin{itemize}
+    \item Cells with \emph{low} $\Vdci{i}$ (undercharged)
+          $\to$ \textbf{clamped} (absorb more power, charge faster).
+    \item Cells with \emph{high} $\Vdci{i}$ (overcharged)
+          $\to$ \textbf{non-clamped} (absorb less power, charge slower).
+\end{itemize}
+
+In both cases, the rule drives all voltages toward the average.
+\end{statebox}
+
+% ── §4.2 ─────────────────────────────────────────────────────────────────
+\subsection{Two-Cell Case Study}
+\label{subsec:two_cell}
+
+\figentry{fig:paper_fig5}{DLVBMCHBC_Fig5_page03}%
+    {Two-cell case study showing DC-link voltage balancing with
+     $t_{bal} = 5$\,ms (paper Fig.\,5).
+     The simulation is divided into four regions (I--IV) by the sign of
+     $\vg\ig$ and the relative ordering of $\Vdci{1}$ and $\Vdci{2}$.
+     \textbf{Region I ($\vg\ig > 0$, $\Vdci{1} > \Vdci{2}$):}
+         Cell~1 is clamped (overcharged, discharging fast), cell~2 is
+         non-clamped (undercharged, recovering slowly).
+     \textbf{Region II ($\vg\ig < 0$, $\Vdci{1} > \Vdci{2}$):}
+         Sign reversal --- cell~2 is now clamped to charge faster,
+         cell~1 non-clamped.
+     \textbf{Regions III--IV:} voltages have crossed;
+         assignment swaps to continue driving toward balance.
+     The DC-link voltages converge to the common target within
+     $\approx 140$\,ms.}{0.9}
+
+Walking through each region of \figref{fig:paper_fig5}:
+
+\begin{circuitbox}[Region-by-Region Analysis (Two-Cell Case)]
+\begin{enumerate}
+    \item \textbf{Region I} ($\vg\ig > 0$, inverter mode;
+          $\Vdci{1} > \Vdci{2}$).
+          Cell~1 is overcharged $\Rightarrow$ clamped:
+          it delivers extra loading power and discharges toward the
+          average.
+          Cell~2 is undercharged $\Rightarrow$ non-clamped:
+          it delivers less power and its voltage recovers.
+          Both voltages move toward each other.
+
+    \item \textbf{Region II} ($\vg\ig < 0$, rectifier mode;
+          still $\Vdci{1} > \Vdci{2}$).
+          The grid power sign has flipped.
+          Now the rule for rectifier mode applies:
+          undercharged cell (cell~2) is clamped to absorb more power
+          and charge faster; overcharged cell (cell~1) is non-clamped.
+          Balancing continues in the same direction.
+
+    \item \textbf{Regions III--IV.}
+          Eventually $\Vdci{1}$ and $\Vdci{2}$ cross (or converge close
+          enough that the ranking reverses).
+          The algorithm detects the new rank and swaps assignments.
+          The back-and-forth is fast: the $\approx 140$\,ms settling
+          covers roughly 7 grid cycles.
+\end{enumerate}
+\end{circuitbox}
+
+% ── §4.3 ─────────────────────────────────────────────────────────────────
+\subsection{Four-Cell Case: Five Operation Modes}
+\label{subsec:four_cell}
+
+\figentry{fig:paper_fig6}{DLVBMCHBC_Fig6_page04}%
+    {Five operation modes for the four-cell ($n = 4$) case
+     (paper Fig.\,6).
+     Each mode is defined by which cell(s) are clamped and which are
+     non-clamped.
+     \textbf{Mode 1:} all cells non-clamped (balanced steady state).
+     \textbf{Mode 2:} one cell clamped, three non-clamped.
+     \textbf{Mode 3:} two cells clamped, two non-clamped.
+     \textbf{Mode 4:} three cells clamped, one non-clamped.
+     \textbf{Mode 5:} all cells clamped (maximum imbalance correction).
+     The algorithm selects the mode with the minimum number of clamped
+     cells that can still achieve balance, so as to minimise waveform
+     distortion.}{0.9}
+
+For $n > 2$ cells the algorithm must decide not only \emph{which}
+cells are clamped but also \emph{how many}.
+\figref{fig:paper_fig6} shows the five modes possible for $n = 4$:
+
+\begin{statebox}[Mode Selection Rule]
+Starting from Mode~1 (all non-clamped), increment the mode
+(add one more clamped cell) until the target loading powers
+$\PHi{i}^{*} = P_{i,\mathrm{src}}$ for all cells can be satisfied
+simultaneously within the coupling constraint
+$\sum_i \Vdci{i}\,\Mi = \vref$.
+
+The minimum-mode strategy limits the distortion introduced by clamping
+while still achieving full balance each period.
+\end{statebox}
+
+\begin{physbox}[General $N$-Cell Summary]
+For $N$ cells with loading powers sorted as
+$P_{1,\mathrm{src}} \geq P_{2,\mathrm{src}} \geq \cdots \geq P_{N,\mathrm{src}}$
+(inverter mode, cells ranked by descending $\Vdci{i}$):
+\begin{itemize}
+    \item The $k$ most overcharged cells receive clamped modulation.
+    \item The remaining $N-k$ cells receive non-clamped modulation.
+    \item $k$ is the smallest integer such that the power targets can
+          all be met.
+    \item At each update, $k$ can be 0 (all sinusoidal) up to $N$ (all clamped).
+\end{itemize}
+\end{physbox}
+
+\clearpage
+
+% ============================================================
+\section{Performance: Simulation and Experiment}
+\label{sec:results}
+% ============================================================
+
+\textit{This section shows what the proposed method achieves against the
+conventional PI method across three metrics: maximum imbalance capability,
+transient response, and steady-state waveform quality.}
+
+% ── §5.1 ─────────────────────────────────────────────────────────────────
+\subsection{Maximum Loading Power Capability}
+\label{subsec:max_capability}
+
+\figentry{fig:paper_fig9}{DLVBMCHBC_Fig9_page04}%
+    {Maximum loading power of the proposed method vs.\ conventional
+     PI balancing as a function of modulation index $\Mi$
+     (paper Fig.\,9).
+     At $\Mi = 0.70$ the proposed method achieves $\approx 1.82$ p.u.,
+     while the conventional PI is limited to $\approx 1.43$ p.u.\ ---
+     a 27\,\% improvement in the maximum imbalance the converter can
+     tolerate before losing balance.
+     The proposed method's curve follows $4/(\pi\Mi)$ (the full-clamping
+     ratio), while the PI method is bounded by its small-correction
+     architecture.}{0.85}
+
+The 27\,\% gain in maximum loading power capability has two practical consequences:
+\begin{itemize}
+    \item \textbf{Wider operating range}: the CHB can stay balanced under
+          larger source power differences (e.g., more unequal PV shading).
+    \item \textbf{Faster transients}: because the algorithm can command
+          a larger power correction per cycle, it converges faster.
+\end{itemize}
+
+% ── §5.2 ─────────────────────────────────────────────────────────────────
+\subsection{Simulation: Three Power-Factor Cases}
+\label{subsec:simulation_pf}
+
+\figentry{fig:paper_fig10}{DLVBMCHBC_Fig10_page05}%
+    {Simulation comparison of conventional (left) vs.\ proposed (right)
+     balancing for three power-factor cases: unity PF, 0.8 lagging,
+     and 0.8 leading (paper Fig.\,10).
+     Each sub-plot shows DC-link voltages $\Vdci{1}$ through $\Vdci{6}$
+     over time.
+     In all three cases, the proposed method reaches balanced steady state
+     significantly faster than the conventional PI.
+     Power factor affects the loading power magnitude ($\cos\phig$ factor)
+     but not the qualitative advantage of the proposed method.}{0.95}
+
+The three power-factor cases confirm that the speed advantage holds
+across the full range of practical operating conditions.
+The lagging and leading PF cases reduce the absolute loading power
+(smaller $\cos\phig$) but the algorithm compensates by selecting larger
+$\phic$, staying on the same normalised loading power surface
+(paper Fig.\,8).
+
+% ── §5.3 ─────────────────────────────────────────────────────────────────
+\subsection{Simulation: Maximum Performance at Unity PF}
+\label{subsec:simulation_max}
+
+\figentry{fig:paper_fig11}{DLVBMCHBC_Fig11_page06}%
+    {Maximum-performance simulation at unity power factor
+     (paper Fig.\,11).
+     Shows the DC-link voltages converging from a severe imbalance
+     (one cell significantly overcharged, another undercharged) to
+     balanced steady state.
+     The proposed method drives the voltages to within $\pm 1$\,\% of
+     target in $\approx 140$\,ms.
+     Also shown: the grid current $\ig$ remains sinusoidal throughout,
+     demonstrating that clamped modulation does not compromise current
+     quality during transients.}{0.9}
+
+% ── §5.4 ─────────────────────────────────────────────────────────────────
+\subsection{Hardware Prototype}
+\label{subsec:hardware}
+
+\figentry{fig:paper_fig12}{DLVBMCHBC_Fig12_page06}%
+    {Hardware prototype used for experimental validation
+     (paper Fig.\,12).
+     Three-cell CHB, 230\,V grid, resistor bank load, isolated DC
+     sources per cell.
+     The converter is rated for 3\,kW total with $\Vdci{i} = 180$\,V
+     per cell (540\,V total DC bus).
+     The prototype runs at $f_{sw} = 10$\,kHz and $f_{bal} = 3.6$\,kHz.
+     All controller algorithms (conventional PI and proposed) are
+     implemented on the same DSP platform for a fair comparison.}{0.85}
+
+% ── §5.5 ─────────────────────────────────────────────────────────────────
+\subsection{Experimental: Steady-State Results}
+\label{subsec:exp_steady}
+
+\figentry{fig:paper_fig13}{DLVBMCHBC_Fig13_page07}%
+    {Steady-state experimental results for three loading cases
+     (paper Fig.\,13).
+     \textbf{Case 1 (balanced):} all cells at equal $\Vdci{i}$; all
+     cells run in non-clamped mode; modulation waveforms are sinusoidal.
+     \textbf{Case 2 (mild imbalance):} one cell is clamped with small
+     $\phic$; the clamped-mode flat top is just visible on the
+     oscilloscope trace.
+     \textbf{Case 3 (severe imbalance):} one cell is fully clamped
+     ($\phic \approx \pi/2$); the square-wave top is clearly visible
+     on the clamped cell's modulation signal.
+     In all cases the grid current remains sinusoidal (bottom trace).}{0.95}
+
+The steady-state results confirm:
+\begin{itemize}
+    \item Non-clamped cells produce clean sinusoidal modulation
+          (standard PWM appearance).
+    \item Clamped cells show the characteristic flat-top waveform whose
+          width grows with $\phic$.
+    \item Grid current quality (THD) is maintained across all three cases,
+          validating that clamped modulation in the balancing layer does not
+          degrade the inner current loop.
+\end{itemize}
+
+% ── §5.6 ─────────────────────────────────────────────────────────────────
+\subsection{Experimental: Dynamic Transient --- The Payoff Figure}
+\label{subsec:exp_transient}
+
+\figentry{fig:paper_fig14}{DLVBMCHBC_Fig14_page08}%
+    {Dynamic transient comparison: conventional PI (left) vs.\ proposed
+     method (right) for a step imbalance in DC source power
+     (paper Fig.\,14).
+     \textbf{Conventional PI:} settling time $\approx 1850$\,ms
+     (92 grid cycles).
+     The DC-link voltages drift far apart before the slow PI brings
+     them back.
+     \textbf{Proposed method:} settling time $\approx 140$\,ms
+     (7 grid cycles).
+     The voltages converge within the first few cycles.
+     This is the $\mathbf{13\times}$ improvement that is the central
+     claim of the paper.}{0.95}
+
+\begin{eqnbox}[The Key Result]
+\[
+    \boxed{
+    \text{Conventional PI: } 1850\,\text{ms}
+    \quad\longrightarrow\quad
+    \text{Proposed method: } 140\,\text{ms}
+    \quad\bigl(13\times \text{ faster}\bigr)
+    }
+\]
+Both methods reach the same steady-state outcome:
+balanced DC-link voltages and sinusoidal grid current.
+The only difference is how fast they get there --- and the difference
+is large enough to be the primary engineering contribution of the paper.
+\end{eqnbox}
+
+The speed advantage comes entirely from the change in architecture:
+instead of nudging $\Mi$ by $\Delta M_i$ each cycle (PI),
+the algorithm computes the exact $\Mi^{*}$ and $\phic^{*}$ that
+achieve balance and applies them in \emph{one} balancing period.
+The loading power closed-form expressions derived in
+Section~\ref{sec:proposed} make this one-step inversion possible.
 
 \end{document}
