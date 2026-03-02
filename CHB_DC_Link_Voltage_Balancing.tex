@@ -699,45 +699,71 @@ quantitatively.  The question is: can we give the balancing algorithm
 \label{subsec:clamped_mode}
 
 % ·· Level-1 intuition ·····················································
-\begin{physbox}[Start here: what happens to $v_i \cdot \ig$ near a zero crossing?]
-Loading power is the area under the curve $p(\theta) = v_i(\theta)\cdot\ig(\theta)$.
-Ask yourself: \emph{how much area does the region near a zero crossing contribute?}
+\begin{physbox}[The signals-and-systems root cause: orthogonality]
+\textbf{Step 1 --- Only the fundamental of $v_i$ matters for power.}
 
-\textbf{Non-clamped case.}
-At unity power factor both $v_i$ and $\ig$ are sinusoids at the same
-frequency, so they reach zero \emph{at the same moment}.
-Near the crossing at $\theta = 0$:
+The grid current is controlled to be a pure sinusoid:
+$\ig(\theta) = \Ig\sin(\theta - \phig)$.
+The loading power is the inner product of $v_i$ and $\ig$:
 \[
-  v_{nc} \approx M\Vdc\cdot\theta, \qquad
-  \ig    \approx \Ig\cdot\theta
-  \qquad\Longrightarrow\qquad
-  p(\theta) = v_{nc}\cdot\ig \approx M\Vdc\Ig\,\theta^{2}
+  \PHi{i}
+  = \frac{1}{2\pi}\int_0^{2\pi} v_i(\theta)\,\ig(\theta)\;d\theta
 \]
-The power near the crossing goes as $\theta^2$ --- a \emph{parabola} that
-pinches tightly to zero.  The area of a thin strip of width $\phic$ under a
-parabola is $\propto \phic^{3}/3$, which is extremely small for small $\phic$.
-
-\textbf{Clamped case.}
-Now $v_c^{*}$ is frozen at $M\Vdc\sin\phic$ while $\ig$ is still a sinusoid:
+Expand $v_i$ in its Fourier series:
+$v_i = \sum_{n=1}^{\infty} b_n\sin(n\theta + \psi_n)$.
+By the orthogonality of sinusoids, $\int_0^{2\pi}\sin(n\theta)\sin(m\theta)\,d\theta = 0$
+for $n \neq m$.
+Therefore \emph{every harmonic of $v_i$ above the fundamental integrates
+to zero against $\ig$}.  Only the $n=1$ term survives:
 \[
-  v_c^{*} = M\Vdc\sin\phic \;(\text{constant}), \qquad
-  \ig \approx \Ig\cdot\theta
-  \qquad\Longrightarrow\qquad
-  p(\theta) = M\Vdc\Ig\,\sin\phic\cdot\theta
+  \PHi{i} = \tfrac{1}{2}\,b_1\,\Vdc\,\Ig\,\cos\phig
 \]
-Now the power near the crossing goes as $\theta$ --- a \emph{straight line},
-not a parabola.  The area under a straight line of width $\phic$ is
-$\propto \phic^{2}/2$, which is \emph{much larger} than $\phic^{3}/3$ for
-small $\phic$.
+where $b_1$ is the \textbf{fundamental Fourier coefficient} of the
+normalised $v_i/\Vdc$.
 
-\textbf{The key insight:}
-Non-clamped suffers from a \emph{double penalty} --- both $v$ and $i$ go
-to zero together, so their product goes to zero as $\theta^2$.
-Clamping breaks this: $v$ stays nonzero, so the product goes to zero only
-as $\theta^1$.  The near-crossing region contributes real area to the
-loading power integral instead of contributing almost nothing.
-Wider $\phic$ means a larger near-crossing window converts from
-``parabolic-zero'' to ``linear'', so more total area is gained.
+\medskip
+\textbf{Step 2 --- The real question: which waveform shape maximises $b_1$?}
+
+The coupling constraint $\sum_i \Vdci{i}\Mi = \Vref$ fixes the peak
+amplitude of each cell's reference at $M\Vdc$.  We cannot increase $M$
+further without violating this constraint or over-modulating
+($M > 1$).  But the \emph{shape} of $v_i$ is not constrained --- only
+its peak $|v_i| \leq M\Vdc$.
+
+This is now a pure signals question: \emph{for a given amplitude bound
+$M\Vdc$, which periodic waveform maximises its fundamental Fourier
+coefficient $b_1$?}
+
+By inspection (or calculus of variations): the answer is the
+\textbf{square wave} of amplitude $M\Vdc$:
+\[
+  v_\mathrm{sq}(\theta) = M\Vdc\,\mathrm{sign}(\sin\theta)
+  \qquad\Longrightarrow\qquad
+  b_1^\mathrm{sq} = \frac{4}{\pi} \approx 1.273
+\]
+The sinusoidal reference achieves only $b_1^\mathrm{sin} = 1.000$.
+A square wave therefore transfers $4/\pi \approx 27\%$ more loading
+power than a sinusoid at the \emph{same} peak amplitude $M$.
+
+\medskip
+\textbf{Step 3 --- Why not simply command a square wave?}
+
+A square wave has large odd harmonics ($b_n = 4/n\pi$).  These harmonic
+voltages drive harmonic currents through $L_f$, injecting THD into the
+grid --- which is limited by grid codes.  The paper therefore needs a
+\emph{continuously tuneable family} of waveforms that:
+\begin{itemize}
+  \item at one extreme equals the sinusoid ($b_1 = 1$, zero extra THD);
+  \item at the other extreme approaches the square wave ($b_1 = 4/\pi$,
+        maximum extra power);
+  \item can be tuned smoothly between the two extremes via a single
+        parameter $\phic$.
+\end{itemize}
+\textbf{Clamped modulation is exactly that family.}  By freezing $v_i$
+at $\pm M\Vdc\sin\phic$ near the zero crossings (instead of letting it
+descend to zero), the waveform is \emph{lifted} toward the square wave
+in a controlled way.  $\phic = 0$ gives the sinusoid;
+$\phic = \pi/2$ gives the square wave.
 \end{physbox}
 
 % ·· Mode 1 recap ··························································
@@ -812,11 +838,17 @@ $v_c^{*} = M\,\mathrm{sign}(\sin\theta)$ --- a square wave of amplitude $M$.
 \end{circuitbox}
 
 % ·· Why it increases loading power ········································
-\subsubsection*{Why does clamping increase the loading power?}
+\subsubsection*{Direct power comparison: computing $\PHcl - \PHnc$}
 
-The loading power is $P = (1/T)\!\int_0^T v_i\,\ig\,dt$.  With $\theta =
-\omg t$ and unity power factor ($\phig = 0$) so that $\ig = \Ig\sin\theta$:
+From Step~1 above, loading power equals half the fundamental coefficient
+times $\Vdc\Ig\cos\phig$.  Compute both integrals explicitly at unity
+power factor ($\phig = 0$, $\ig = \Ig\sin\theta$):
 
+\[
+  \PHnc = \frac{M\Vdc\Ig}{2\pi}\int_0^{2\pi}\sin^2\theta\;d\theta
+        = \frac{M\Vdc\Ig}{2\pi}\cdot\pi
+        = \frac{M\Vdc\Ig}{2}
+\]
 \[
   \PHcl
   \;=\;
@@ -824,18 +856,37 @@ The loading power is $P = (1/T)\!\int_0^T v_i\,\ig\,dt$.  With $\theta =
   \int_0^{2\pi} f_c(\theta)\,\sin\theta\;d\theta
 \]
 
-where $f_c(\theta)$ is the normalised clamped waveform
-($v_c^{*} = M\Vdc\,f_c$).  Breaking the integral over the six pieces
-above:
+where $f_c(\theta)$ is the normalised clamped waveform (piecewise
+definition above).  The \emph{difference} $\PHcl - \PHnc$ is:
+\[
+  \PHcl - \PHnc
+  \;=\;
+  \frac{M\Vdc\Ig}{2\pi}
+  \int_0^{2\pi}
+  \underbrace{\bigl[f_c(\theta) - \sin\theta\bigr]}_{\geq\,0\text{ everywhere}}
+  \cdot\sin\theta\;d\theta
+  \;\;\geq\; 0
+\]
+The integrand is non-negative everywhere because:
+\begin{itemize}
+  \item In $[0,\phic]$ and $[\pi-\phic,\pi]$: $f_c = \sin\phic > \sin\theta$
+        (the flat region is \emph{above} the sinusoid near the crossing)
+        and $\sin\theta \geq 0$, so the product is positive.
+  \item In $[\phic,\pi-\phic]$: $f_c = \sin\theta$, difference is zero.
+  \item Negative half-cycle: by odd symmetry both factors flip sign,
+        product remains non-negative.
+\end{itemize}
+Therefore $\PHcl \geq \PHnc$ for \emph{all} $\phic \geq 0$, with
+equality only at $\phic = 0$.  Breaking the integral over the six pieces:
 
 \[
   \int_0^{2\pi} f_c\,\sin\theta\;d\theta
   \;=\;
   \underbrace{2\!\int_{\phic}^{\pi-\phic}\!\sin^2\!\theta\;d\theta}_{%
-    \text{sinusoidal pieces (I, V)}}
+    \text{sinusoidal pieces}}
   \;+\;
   \underbrace{4\sin\phic\!\int_0^{\phic}\!\sin\theta\;d\theta}_{%
-    \text{flat pieces (II, III, IV, VI)}}
+    \text{flat pieces (four corners)}}
 \]
 
 Evaluating each group:
