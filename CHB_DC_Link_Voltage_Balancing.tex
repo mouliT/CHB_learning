@@ -698,91 +698,223 @@ quantitatively.  The question is: can we give the balancing algorithm
 \subsection{Clamped Modulation --- A New Degree of Freedom}
 \label{subsec:clamped_mode}
 
-Before comparing the two modes, recall what the modulation reference
-physically does.  The H-bridge PWM block compares the reference against
-a triangular carrier.  The \emph{shape} of the reference therefore
-determines the time-averaged output voltage of the cell, and hence how
-much average power the cell transfers to (or absorbs from) the grid.
-Two cells running different reference \emph{shapes} --- while sharing
-the same peak amplitude $M$ --- will deliver different loading powers.
-This is the degree of freedom the paper exploits.
+% ·· Level-1 intuition ·····················································
+\begin{physbox}[Start here: the bucket-and-hose analogy]
+Imagine trying to fill a bucket with a hose whose flow rate varies as a
+sine wave.  During the positive half of the cycle, water flows in; during
+the negative half, it is sucked back out.  Over a full cycle the net
+water is exactly zero --- the bucket is perfectly balanced.
 
-\bigskip
-\noindent\textbf{Mode 1 --- Non-clamped ($v_{nc}^{*}$): standard sinusoid.}
+Now suppose instead of letting the flow rate glide all the way to zero at
+the zero-crossing, you \emph{freeze} it at a small positive trickle for a
+short window either side of the crossing.  Even that tiny trickle, held
+for the duration of the window, adds net water.  The wider the window
+(larger $\phic$), the more extra water you accumulate.
 
-The reference is $v_{nc}^{*}(t) = M\sin(\omg t)$ for the entire cycle
---- a pure, smooth sinusoid.  The cell output tracks this faithfully
-via PWM.  The loading power formula derived in
-\S\ref{subsec:PH_derivation} applies directly:
+This is precisely what clamped modulation does.  The ``hose'' is the
+cell's output voltage $v_i(t)$; the ``water'' is energy flowing into the
+DC capacitor (or back to the source).  By \emph{not} letting $v_i$ cross
+zero smoothly, the cell absorbs more energy per cycle --- without ever
+changing its peak amplitude $M$.
+\end{physbox}
+
+% ·· Mode 1 recap ··························································
+\noindent\textbf{Mode 1 --- Non-clamped ($\PHnc$): standard sinusoid.}
+
+The reference is $v_{nc}^{*}(\theta) = M\sin\theta$ for the entire cycle.
+Loading power (derived in \S\ref{subsec:PH_derivation}):
 \[
     \PHnc \;=\; \tfrac{1}{2}\,\Vdc\,M\,\Ig\,\cos\phig
 \]
-Once $M$ and $\Ig$ are set by the current control loop, $\PHnc$ is
-completely determined.  \textbf{There is no remaining knob for the
-balancing algorithm to turn.}
+Once $M$ and $\Ig$ are fixed by the control loops, $\PHnc$ is locked.
+\textbf{No free parameter remains.}
 
+% ·· Mode 2 definition ·····················································
 \bigskip
-\noindent\textbf{Mode 2 --- Clamped ($v_{c}^{*}$): flat windows near
-zero crossings.}
+\noindent\textbf{Mode 2 --- Clamped ($\PHcl$): frozen windows near zero
+crossings.}
 
 \figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
-    {Clamped modulation signal with varied clamping angle $\varphi$
-     (paper Fig.\,7).  Away from the zero crossings the reference
-     follows the sinusoid (solid curve).  Within a window of half-width
-     $\varphi$ either side of each zero crossing, the reference is
-     \emph{held flat} at the value it would have at the window boundary
-     (dotted flat segments).  Increasing $\varphi$ widens the flat
-     region, which increases the loading power as shown in
-     \figref{fig:paper_fig8}.}{0.62}
+    {Clamped modulation signal (paper Fig.\,7).  The solid portions
+     follow the sinusoid near the peak.  The dotted flat segments are
+     the \emph{clamped} regions: the reference is frozen at
+     $\pm M\sin\phic$ for a window of half-width $\phic$ either side
+     of each zero crossing.  Larger $\phic$ widens the flat region.}{0.62}
 
-In clamped mode the reference is modified as follows, and
-\figref{fig:paper_fig7} shows exactly what this looks like:
+The clamped reference is a piecewise function.  Writing $\theta = \omg t
+\in [0, 2\pi)$ and using the clamping half-angle $\phic \in [0,\pi/2]$:
 
+\begin{eqnbox}[Piecewise definition of $v_c^{*}(\theta)$]
+\[
+v_c^{*}(\theta) \;=\; M \cdot
+\begin{cases}
+  \sin\phic          & \theta \in [0,\,\phic) \\[4pt]
+  \sin\theta         & \theta \in [\phic,\;\pi-\phic] \\[4pt]
+  \sin\phic          & \theta \in (\pi-\phic,\;\pi) \\[4pt]
+  -\sin\phic         & \theta \in [\pi,\;\pi+\phic) \\[4pt]
+  \sin\theta         & \theta \in [\pi+\phic,\;2\pi-\phic] \\[4pt]
+  -\sin\phic         & \theta \in (2\pi-\phic,\;2\pi]
+\end{cases}
+\]
+\textbf{Sanity check:} at $\phic = 0$ every flat piece has
+$\sin 0 = 0$ and the sinusoidal pieces cover the full cycle
+$\Rightarrow$ $v_c^{*} = M\sin\theta$ = non-clamped.
+At $\phic = \pi/2$ the sinusoidal pieces vanish and
+$v_c^{*} = M\,\mathrm{sign}(\sin\theta)$ --- a square wave of amplitude $M$.
+\end{eqnbox}
+
+\begin{circuitbox}[Reading the piecewise formula piece by piece]
 \begin{enumerate}
-    \item \textbf{Away from each zero crossing:} the reference tracks
-          the sinusoid $M\sin(\omg t)$ normally.  The cell switches and
-          approximates the sinusoidal waveform as usual.
+  \item $[0, \phic)$: the cycle has just started (positive half),
+        but the reference is already \emph{frozen} at $M\sin\phic$
+        --- a small positive constant --- instead of rising from zero.
 
-    \item \textbf{Within a window of half-width $\varphi$ around each
-          zero crossing:} the reference is \emph{frozen} at the
-          boundary value --- the sinusoidal value at the moment the
-          window began.  For a positive-to-negative zero crossing at
-          angle $\theta_{0}$, the reference is held at
-          $M\sin(\theta_{0} - \varphi)$ throughout the window
-          $[\theta_{0}-\varphi,\;\theta_{0}+\varphi]$.
+  \item $[\phic, \pi-\phic]$: the reference tracks the sinusoid
+        normally, sweeping through its positive peak at $\theta=\pi/2$.
+        This is the only sinusoidal region in the positive half-cycle.
 
-    \item \textbf{After the window:} the reference resumes tracking
-          the (now negative) sinusoid from the boundary value.
+  \item $(\pi-\phic, \pi)$: approaching the zero crossing at $\pi$,
+        the reference is frozen again at $M\sin\phic$ rather than
+        descending to zero.  The signal does \emph{not} cross zero
+        smoothly; it makes a step down to $-M\sin\phic$ at $\theta=\pi$.
+
+  \item $[\pi, \pi+\phic)$: the negative half-cycle starts with the
+        reference frozen at $-M\sin\phic$ (mirror of piece 1).
+
+  \item $[\pi+\phic, 2\pi-\phic]$: sinusoidal region of the negative
+        half-cycle, sweeping through the trough at $\theta = 3\pi/2$.
+
+  \item $(2\pi-\phic, 2\pi]$: frozen at $-M\sin\phic$ before the next
+        positive zero crossing (mirror of piece 3).
 \end{enumerate}
+\end{circuitbox}
 
-The key physical effect: instead of passing smoothly through zero,
-the cell output \emph{dwells} at a small but nonzero level for the
-duration $2\varphi$.  This means the integral
-$(1/T)\!\int_{0}^{T}\! v_{c}^{*}\,\ig\,dt$ is \emph{larger} than its
-non-clamped counterpart, because the flat region contributes net
-positive area during the positive half-cycle (and net negative area
-during the negative half-cycle) instead of cancelling to zero at the
-crossing.
+% ·· Why it increases loading power ········································
+\subsubsection*{Why does clamping increase the loading power?}
 
-\begin{physbox}[How $\varphi$ controls loading power]
-Think of it this way.  Near a zero crossing, the sinusoid is heading
-from positive to negative (or vice versa).  If we freeze it at a
-small positive value for a window $2\varphi$, the grid current
-$\ig$ is still flowing in the positive direction during that window.
-The product $v_c^{*} \cdot \ig > 0$ throughout the window, adding
-extra positive energy to the integral.  The wider $\varphi$ is, the
-longer this dwell, and the larger the extra contribution.  This is
-why the clamped loading power \emph{increases} with $\varphi$, as
-confirmed by \figref{fig:paper_fig8}.
+The loading power is $P = (1/T)\!\int_0^T v_i\,\ig\,dt$.  With $\theta =
+\omg t$ and unity power factor ($\phig = 0$) so that $\ig = \Ig\sin\theta$:
+
+\[
+  \PHcl
+  \;=\;
+  \frac{M\Vdc\Ig}{2\pi}
+  \int_0^{2\pi} f_c(\theta)\,\sin\theta\;d\theta
+\]
+
+where $f_c(\theta)$ is the normalised clamped waveform
+($v_c^{*} = M\Vdc\,f_c$).  Breaking the integral over the six pieces
+above:
+
+\[
+  \int_0^{2\pi} f_c\,\sin\theta\;d\theta
+  \;=\;
+  \underbrace{2\!\int_{\phic}^{\pi-\phic}\!\sin^2\!\theta\;d\theta}_{%
+    \text{sinusoidal pieces (I, V)}}
+  \;+\;
+  \underbrace{4\sin\phic\!\int_0^{\phic}\!\sin\theta\;d\theta}_{%
+    \text{flat pieces (II, III, IV, VI)}}
+\]
+
+Evaluating each group:
+\begin{align*}
+  2\!\int_{\phic}^{\pi-\phic}\!\sin^2\!\theta\;d\theta
+    &= (\pi - 2\phic) + \sin 2\phic \\[4pt]
+  4\sin\phic\!\int_0^{\phic}\!\sin\theta\;d\theta
+    &= 4\sin\phic\,(1 - \cos\phic)
+\end{align*}
+
+\begin{eqnbox}[Clamped loading power --- closed form]
+\[
+  \boxed{
+    \PHcl
+    \;=\;
+    \frac{M\Vdc\Ig\cos\phig}{2\pi}
+    \Bigl[(\pi - 2\phic) + \sin 2\phic + 4\sin\phic(1-\cos\phic)\Bigr]
+  }
+\]
+(The $\cos\phig$ factor reinstates general power factor by symmetry of
+the derivation.)  Dividing by $\PHnc = \tfrac{1}{2}M\Vdc\Ig\cos\phig$:
+\[
+  \frac{\PHcl}{\PHnc}
+  \;=\;
+  \frac{(\pi - 2\phic) + \sin 2\phic + 4\sin\phic(1-\cos\phic)}{\pi}
+\]
+\end{eqnbox}
+
+\begin{statebox}[Numerical values of the power ratio at unity power factor]
+\centering
+\begin{tabular}{ccc}
+\hline
+$\phic$ & $\PHcl/\PHnc$ & Comment \\
+\hline
+$0^{\circ}$   & 1.000 & No clamping --- identical to non-clamped \\
+$30^{\circ}$  & 1.027 & Barely visible flat region \\
+$60^{\circ}$  & 1.161 & Noticeable flat region near crossings \\
+$90^{\circ}$  & $4/\pi \approx 1.273$ & Square wave --- maximum at unity PF \\
+\hline
+\end{tabular}
+
+\smallskip
+\raggedright
+At $\phic = 90^{\circ}$ the clamped signal becomes a square wave
+($v_c^{*} = M\Vdc\,\mathrm{sign}(\sin\theta)$), whose fundamental
+Fourier coefficient is $4/\pi$ --- the theoretical ceiling at unity PF.
+Paper Fig.\,8 shows values up to ${\approx}1.8$\,p.u.\ at non-unity
+power factor angles, where the asymmetry between $v_c^{*}$ and $\ig$
+zero-crossings provides additional area in the integral.
+\end{statebox}
+
+% ·· Fourier argument ······················································
+\subsubsection*{Why is reshaping the waveform acceptable?}
+
+The clamped waveform is \emph{not} a pure sinusoid, so why does the grid
+not object?  The Fourier series answers this.
+
+\begin{physbox}[Fourier view of the clamped signal]
+Any periodic odd waveform with half-wave symmetry expands as:
+\[
+  v_c^{*}(\theta)
+  \;=\;
+  \sum_{\substack{n=1,3,5,\ldots}} b_n \sin(n\theta)
+\]
+Only odd harmonics appear.  The fundamental coefficient is the $b_1$
+we already computed:
+\[
+  b_1 = \frac{M}{\pi}\bigl[(\pi-2\phic) + \sin 2\phic
+        + 4\sin\phic(1-\cos\phic)\bigr] > M \quad\text{for } \phic > 0
+\]
+Higher harmonics ($n = 3, 5, 7, \ldots$) are present but attenuated:
+\begin{itemize}
+  \item The $n$-th harmonic has voltage amplitude $\sim b_n \Vdc$.
+  \item The filter inductance $L_f$ presents impedance $n\omg L_f$ to
+        the $n$-th harmonic.
+  \item The resulting harmonic current $\sim b_n\Vdc / (n\omg L_f)$
+        falls off as $1/n$.
+  \item Harmonic power $\sim (b_n)^2/n^2$ falls off as $1/n^2$.
+\end{itemize}
+At $\phic = 90^{\circ}$ (square wave) the spectrum is $b_n = 4M/n\pi$,
+so the 3rd harmonic current is $1/3$ and its power is $1/9$ of the
+fundamental.  The H-bridge already produces PWM switching harmonics at
+$f_c = 12f$ (and multiples) that $L_f$ is designed to block.  The
+clamping harmonics at $3f, 5f, \ldots$ lie well below $f_c$ but are
+also suppressed by $L_f$, keeping the grid-current THD within code limits.
+
+\textbf{Crucially}: only the fundamental $b_1\sin\theta$ overlaps with
+$\ig = \Ig\sin\theta$ and therefore contributes to real power transfer.
+The harmonics are reactive and filtered.  The balancing algorithm is
+exploiting exactly this: it raises $b_1 > M$ by clamping, thereby
+transferring more real power per cycle, without needing to raise $M$
+above its saturation limit of 1.
 \end{physbox}
 
-\begin{warningbox}[$\varphi$ and $M$ are independent knobs]
-Changing $M$ scales the entire sinusoid uniformly --- it shifts every
-point on the waveform up or down proportionally.  Changing $\varphi$
-\emph{reshapes} the waveform without touching the peak amplitude.
-In the paper: $M$ is fixed by the outer voltage and inner current
-control loops; $\varphi$ is the free parameter the balancing algorithm
-adjusts independently per cell.
+\begin{warningbox}[$\phic$ and $M$ are independent knobs]
+Changing $M$ scales every point of the sinusoid uniformly --- the shape
+is unchanged, only the amplitude changes.  Changing $\phic$ \emph{reshapes}
+the waveform: the peak amplitude $M$ is untouched, but the flat windows
+near the zero crossings grow wider.  In the paper, $M$ is fixed globally
+by the outer voltage and inner current loops; $\phic$ is what the
+balancing algorithm tunes \emph{independently per cell}.
 \end{warningbox}
 
 % ── §3.3 ─────────────────────────────────────────────────────────────────────
