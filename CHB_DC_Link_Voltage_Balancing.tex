@@ -746,66 +746,72 @@ A square wave therefore transfers $4/\pi \approx 27\%$ more loading
 power than a sinusoid at the \emph{same} peak amplitude $M$.
 
 \medskip
-\textbf{Step 3 --- Why not simply command a square wave?}
+\textbf{Step 3 --- Why clamped modulation and not always a square wave?}
 
-A natural objection: in a CHB the KVL gives $\vg = \sum_i v_i$, so:
+You may object: the KVL $\vg = \sum_i v_i$ allows any decomposition,
+for instance
 \[
-  \vg \;=\; \underbrace{v_1}_{\text{square}} \;+\;
-            \underbrace{(\vg - v_1)}_{\text{remaining cells}}
+  \vg \;=\; k_1\,v_{\mathrm{sq},1} + k_2\,v_{\mathrm{sq},2} + \cdots +
+  \Bigl(\vg - \sum_j k_j\,v_{\mathrm{sq},j}\Bigr)
 \]
-Since the current controller keeps $\sum_i v_i$ sinusoidal, and cell~1
-outputs a square wave, the remaining cells collectively output
-$\vg - v_\text{square}$ --- a signal that cancels the harmonics in the
-sum.  The total is still sinusoidal, $\ig$ is still sinusoidal.
-\textbf{There is no THD issue and no headroom issue}: with $n$ balanced
-cells, the combined capacity of the remaining $(n-1)$ cells is exactly
-$(n-1)M\Vdc$, which is precisely what is needed to synthesise
-$\vg - v_\text{square}$.
+With $n$ cells and one coupling constraint
+($\sum_i \Vdci{i}M_i = V_\mathrm{ref}$), there are always $n-1$ free
+loading powers --- and this count does \emph{not} change if some cells
+use square waves.  \textbf{Independence is not actually destroyed.}
 
-The real problem is subtler: \textbf{forcing the remaining cells to
-output $\vg - v_\text{square}$ destroys their independent loading power
-control.}
+The real reason is much simpler: \textbf{range extension}.
 
-\begin{physbox}[Why independence matters]
-The balancing algorithm must drive \emph{each} cell's loading power
-$\PHi{i}$ to match \emph{its own} source power $P_{i,\mathrm{src}}$.
-Every cell needs its own degree of freedom.
+\begin{physbox}[The real constraint: maximum achievable loading power per cell]
+With a sinusoidal reference the loading power is fixed at
+\[
+  \PHnc = \tfrac{1}{2}\,\Vdci{i}\,M_i\,\Ig\,\cos\phig
+\]
+and it cannot be increased further by tuning $M_i$ without violating
+the modulation limit.  The conventional PI-based approach (paper
+Fig.\,3) adjusts only $M_i$, so every cell is trapped at the
+sinusoidal ceiling.
 
-If cell~1 uses a square wave, cells 2\ldots n are \emph{collectively
-constrained} to output $\vg - v_\text{square}$.  Their sum is fixed;
-they can redistribute among themselves, but every reallocation that
-changes cell~2's $v_2$ forces a compensating change in
-$v_3 + \cdots + v_n$.  The cells are no longer independent --- they
-are locked into a coupled constraint.
+From Step~2 we know that a square wave at the same peak amplitude
+achieves $b_1 = 4/\pi \approx 1.273$, delivering 27\% more loading
+power.  This is the highest $b_1$ any waveform bounded by $M\Vdc$
+can achieve.
 
-With clamped modulation each cell's output stays close to a sinusoid
-of amplitude $M_i\Vdci{i}$.  Cell $i$ independently tunes $\phic$
-to adjust its own loading power.  The \emph{only} coupling between
-cells is the single scalar constraint
-$\sum_i \Vdci{i}M_i = V_{\mathrm{ref}}$, which is easily managed
-by the outer control loop.  Every cell retains its own degree of
-freedom.
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lcc}
+\toprule
+Reference shape & $b_1$ & Max $\PHi{i}$ relative to $\PHnc$ \\\midrule
+Sinusoid ($\phic = 0$)        & $1.000$              & $1.00\;\PHnc$ \\
+Clamped ($0 < \phic < \pi/2$) & $1.000$--$4/\pi$     & $1.00$--$1.27\;\PHnc$ \\
+Square wave ($\phic = \pi/2$) & $4/\pi \approx 1.273$ & $1.27\;\PHnc$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Conventional PI balancing is confined to the top row.  Clamped
+modulation spans the entire table, letting the algorithm push any
+cell's loading power up to 27\% above its sinusoidal ceiling ---
+exactly what is needed when a cell's source power exceeds $\PHnc$.
 \end{physbox}
 
-\begin{statebox}[The two constraints $\phic$ satisfies simultaneously]
-\begin{enumerate}
-  \item \textbf{Independent per-cell control.}
-        Each cell tunes its own $\phic \in [0,\pi/2]$ to move its
-        loading power from $\PHnc$ (at $\phic=0$) up to
-        $(4/\pi)\,\PHnc$ (at $\phic=\pi/2$), \emph{without forcing
-        any specific waveform on any other cell}.
+\begin{statebox}[Then why not always command a square wave ($\phic = \pi/2$)?]
+A square wave gives the \emph{maximum} correction (+27\%), but
+correction must \emph{match} the imbalance.  If a cell's source power
+exceeds $\PHnc$ by only 5\%, commanding a full square wave
+overshoots by $\approx$22\%: the capacitor voltage swings the wrong
+way and the balancing loop becomes unstable.
 
-  \item \textbf{Continuous granularity.}
-        Different cells have different imbalances at different instants.
-        A binary choice (sinusoid or square wave) either under-corrects
-        small imbalances or over-corrects them.  The continuous knob
-        $\phic$ lets the algorithm dial in the exact loading power
-        each cell needs, per cycle.
-\end{enumerate}
-Clamped modulation is the family that provides both.
-$\phic = 0$: sinusoid, no extra loading power.
-$\phic = \pi/2$: square wave, maximum loading power.
-Any $\phic$ in between: precise, independent correction.
+The clamp angle $\phic \in [0,\pi/2]$ is the continuously tuneable
+knob that matches correction to imbalance:
+\begin{itemize}
+  \item $\phic = 0$: sinusoidal reference --- zero extra power, no
+        correction.
+  \item $\phic = \pi/2$: square wave --- maximum extra power (+27\%).
+  \item Any $\phic$ in between: a precise intermediate correction
+        sized to the actual imbalance, without overshoot.
+\end{itemize}
+The sorting algorithm (paper Fig.\,4) selects $\phic$ per cell per
+cycle to match each cell's exact imbalance.
 \end{statebox}
 \end{physbox}
 
