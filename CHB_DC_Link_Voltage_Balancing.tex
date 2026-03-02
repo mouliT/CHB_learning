@@ -100,13 +100,13 @@
 \newcommand{\omg}{\omega}
 \newcommand{\phig}{\phi_{g}}
 \newcommand{\Vdc}{V_{dc}}
-\newcommand{\Vdci}[1]{V_{dc,#1}}
+\newcommand{\Vdci}[1]{V_{dc,#1\mathrm{H}}}
 \newcommand{\Vtot}{V_{dc,\mathrm{tot}}}
 \newcommand{\Mi}{M_{i}}
 \newcommand{\phic}{\varphi}
 \newcommand{\vref}{v_{\mathrm{ref}}}
 \newcommand{\PH}{P_{H}}
-\newcommand{\PHi}[1]{P_{H,#1}}
+\newcommand{\PHi}[1]{P_{#1\mathrm{H}}}
 \newcommand{\PHnc}{P_{H}^{\mathrm{nc}}}
 \newcommand{\PHcl}{P_{H}^{\mathrm{cl}}}
 \newcommand{\figref}[1]{Figure~\ref{#1}}
@@ -329,7 +329,7 @@ an equation introduces unfamiliar notation.
 \textbf{Symbol} & \textbf{Meaning} & \textbf{Typical Value / Units} \\
 \midrule
 $n$                    & Number of H-bridge cells            & 3 (prototype), 4 (analysis) \\
-$\Vdci{i}$            & DC-link voltage, cell $i$           & 180\,V (target each) \\
+$\Vdci{i}$            & DC-link voltage, cell $i$ (= paper's $V_{dc,iH}$) & 180\,V (target each) \\
 $\Vtot$                & Total DC voltage $\sum_i \Vdci{i}$ & $n \times 180$\,V \\
 $\ig$, $\Ig$          & Grid current (inst.\ / amplitude)   & A; same through all cells \\
 $\omg$                 & Grid angular frequency              & $2\pi \times 50$\,rad/s \\
@@ -338,10 +338,10 @@ $L_f$                  & Grid-side filter inductance         & mH \\
 $\Mi$                  & Modulation index, cell $i$          & $0 \leq M_i \leq 1$ \\
 $\phic$                & Clamping angle                      & $0$ (none) to $\pi/2$ (full) \\
 $\PH$                  & Loading power (net into cap)        & W \\
-$\PHi{i}$             & Loading power, cell $i$             & W \\
+$\PHi{i}$             & Loading power, cell $i$ (= paper's $P_{iH}$) & W \\
 $\PHnc$                & Non-clamped loading power           & fn.\ of $\Mi$ only \\
 $\PHcl$                & Clamped loading power               & fn.\ of $\Mi$ and $\phic$ \\
-$P_{i,\mathrm{src}}$  & DC source power, cell $i$           & W; unequal between cells \\
+$P_{i,\mathrm{src}}$  & DC source power, cell $i$ (\emph{doc.\ only; paper uses $\PHi{i}$ for both}) & W; equals $\PHi{i}$ in steady state \\
 \bottomrule
 \end{tabular}
 \end{statebox}
@@ -430,6 +430,13 @@ DC source power $P_{i,\mathrm{src}}$ to keep $\Vdci{i}$ constant.
 \end{eqnbox}
 
 \begin{physbox}[Why ``Loading Power'' and Not Just ``Power''? --- The Governing Equation]
+\textit{Notation note:} The paper uses a single symbol $\PHi{i}$
+(loading power) for both the DC source power and the AC-side average
+power, because they are equal in steady state.  This document
+introduces $P_{i,\mathrm{src}}$ as a shorthand for the instantaneous
+DC source power so that the transient capacitor equation below can
+be written unambiguously.
+
 The DC-link capacitor of cell $i$ stores energy
 $E_i = \tfrac{1}{2}C\Vdci{i}^2$.
 Two power flows act on it simultaneously:
@@ -445,7 +452,7 @@ $\tfrac{d}{dt}(\tfrac{1}{2}C V^2) = CV\dot{V}$ gives:
 \]
 Three consequences follow directly from this one equation:
 \begin{enumerate}
-    \item \textbf{Steady state} ($\dot{V}_{dc,i} = 0$) requires exactly
+    \item \textbf{Steady state} ($\dot{V}_{dc,iH} = 0$) requires exactly
           $\PHi{i} = P_{i,\mathrm{src}}$ --- the AC side must absorb
           precisely what the DC source supplies.
     \item \textbf{Overcharging:} if $P_{i,\mathrm{src}} > \PHi{i}$
@@ -474,7 +481,7 @@ for cell $i$ at grid cycle $k$ is:
 Substituting the non-clamped loading power expression
 (derived in Section~2):
 \[
-    \underbrace{\tfrac{1}{2}\,\Vdci{i}(k)\,\Mi(k)\,\Ig\cos\phig}_{P_{H,i}(k)}
+    \underbrace{\tfrac{1}{2}\,\Vdci{i}(k)\,\Mi(k)\,\Ig\cos\phig}_{P_{iH}(k)}
     \;=\; P_{i,\mathrm{src}}(k)
 \]
 The controller must solve this for $\Mi(k)$ \emph{every grid cycle}
