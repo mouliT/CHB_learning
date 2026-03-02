@@ -347,7 +347,7 @@ $\omg$                 & Grid angular frequency              & $2\pi \times 50$\
 $\phig$                & Grid power factor angle             & Fixed by load \\
 $L_f$                  & Grid-side filter inductance         & 1\,mH \\
 $\Mi$                  & Modulation index, cell $i$          & $0 \leq M_i \leq 1$; nominal 0.78 \\
-$\phic$                & Clamping half-angle (sine conv.)    & 0 (sinusoidal) to $\pi/2$ (full square wave); paper uses $\varphi = 2\phic$ \\
+$\phic$                & Clamping angle (paper notation)     & 0 (no clamping) to $\pi$ (maximum clamping) \\
 $\PH$                  & Loading power (average per cycle)   & W \\
 $\PHi{i}$             & Loading power, cell $i$             & W; equals $P_{i,\mathrm{src}}$ in steady state \\
 $\PHnc$                & Non-clamped loading power           & fn.\ of $\Mi$ only \\
@@ -609,14 +609,84 @@ $M$ (paper notation):
 f_c(\theta)=
 \begin{cases}
 1 & \theta\in[0,\phic]\\
-M\cos\theta & \theta\in[\phic,\pi] \text{ and } \theta\in[\pi+\phic,2\pi]\\
+M\sin\theta & \theta\in[\phic,\pi] \text{ and } \theta\in[\pi+\phic,2\pi]\\
 -1 & \theta\in[\pi,\pi+\phic]
 \end{cases}
 \]
 \end{eqnbox}
 
-the paper derives the fundamental magnitude of the clamped signal $F_c(\phic)$ and
-the complementary non-clamped signal $F_{nc}(\phic)$ (paper Eq.\,7):
+we can compute the fundamental explicitly.
+
+\begin{circuitbox}[Step-by-step: deriving paper Eq.\,7]
+We compute the first harmonic coefficients of $f_c(\theta)$:
+\[
+a_1 = \frac{1}{\pi}\int_{0}^{2\pi} f_c(\theta)\cos\theta\,d\theta,
+\qquad
+b_1 = \frac{1}{\pi}\int_{0}^{2\pi} f_c(\theta)\sin\theta\,d\theta
+\]
+
+\textbf{Step 1: split the integral into the four regions.}
+\[
+\int_{0}^{2\pi} (\cdot)\,d\theta
+=
+\int_{0}^{\phic} (\cdot)\,d\theta
++\int_{\phic}^{\pi} (\cdot)\,d\theta
++\int_{\pi}^{\pi+\phic} (\cdot)\,d\theta
++\int_{\pi+\phic}^{2\pi} (\cdot)\,d\theta
+\]
+
+\textbf{Step 2: compute $a_1$.}
+\[
+\pi a_1
+=
+\int_{0}^{\phic} 1\cdot\cos\theta\,d\theta
++\int_{\phic}^{\pi} M\sin\theta\cos\theta\,d\theta
++\int_{\pi}^{\pi+\phic} (-1)\cdot\cos\theta\,d\theta
++\int_{\pi+\phic}^{2\pi} M\sin\theta\cos\theta\,d\theta
+\]
+Use $\int \cos\theta\,d\theta = \sin\theta$ and
+$\int \sin\theta\cos\theta\,d\theta = \tfrac{1}{2}\sin^2\theta$:
+\[
+\pi a_1
+= \sin\phic + \sin\phic + M\left(\tfrac{1}{2}\sin^2\pi - \tfrac{1}{2}\sin^2\phic\right)
++ M\left(\tfrac{1}{2}\sin^2 2\pi - \tfrac{1}{2}\sin^2(\pi+\phic)\right)
+\]
+Since $\sin\pi = \sin 2\pi = 0$ and $\sin(\pi+\phic) = -\sin\phic$:
+\[
+\pi a_1 = 2\sin\phic - M\sin^2\phic
+= \sin\phic\,\bigl(2 - M\sin\phic\bigr)
+\]
+
+\textbf{Step 3: compute $b_1$.}
+\[
+\pi b_1
+=
+\int_{0}^{\phic} 1\cdot\sin\theta\,d\theta
++\int_{\phic}^{\pi} M\sin^2\theta\,d\theta
++\int_{\pi}^{\pi+\phic} (-1)\cdot\sin\theta\,d\theta
++\int_{\pi+\phic}^{2\pi} M\sin^2\theta\,d\theta
+\]
+Use $\int \sin\theta\,d\theta = -\cos\theta$ and
+$\int \sin^2\theta\,d\theta = \tfrac{\theta}{2} - \tfrac{\sin 2\theta}{4}$:
+\[
+\pi b_1
+= (1-\cos\phic) + (1-\cos\phic)
++ M\left[\left(\tfrac{\pi-\phic}{2} + \tfrac{\sin 2\phic}{4}\right)
++\left(\tfrac{\pi-\phic}{2} + \tfrac{\sin 2\phic}{4}\right)\right]
+\]
+So:
+\[
+\pi b_1 = 2 - 2\cos\phic + M(\pi-\phic) + \tfrac{1}{2}M\sin(2\phic)
+\]
+
+\textbf{Step 4: fundamental magnitude.}
+The fundamental magnitude of $f_c$ is
+$F_c(\phic) = \sqrt{a_1^2 + b_1^2}$, which gives paper Eq.\,7.
+\end{circuitbox}
+
+Putting $a_1$ and $b_1$ into $F_c = \sqrt{a_1^2+b_1^2}$ gives the paper's closed form
+for the clamped signal fundamental, and the complementary non-clamped fundamental
+(paper Eq.\,7):
 
 \begin{eqnbox}[Fundamental Magnitudes (paper Eq.\,7)]
 \[
