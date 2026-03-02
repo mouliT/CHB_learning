@@ -648,7 +648,7 @@ compensating changes in the others to keep the sum fixed.
 \label{sec:two_modes}
 % ══════════════════════════════════════════════════════════════════════════════
 
-We established in \S\ref{sec:loading_power} that the balancing algorithm
+We established in \S\ref{sec:loading_power_control} that the balancing algorithm
 adjusts each cell's modulation index $\Mi$ so that its loading power
 $\PHi{i}$ matches its source power $P_{i,\mathrm{src}}$.  But \emph{how
 much correction} can you actually achieve by varying $\Mi$?  This section
@@ -690,7 +690,7 @@ imbalanced cell back in line.
 \end{physbox}
 
 This hard ceiling on achievable correction power is exactly what
-\figref{fig:paper_fig9} (Section~\ref{sec:results}) will confirm
+paper Fig.\,9 (covered in a later section) will confirm
 quantitatively.  The question is: can we give the balancing algorithm
 \emph{more} correction range without violating the modulation limit?
 
@@ -773,8 +773,8 @@ panels side by side:
           assign clamped mode to cells that need to absorb \emph{more}
           power (overcharged capacitors), and non-clamped mode to cells
           that should absorb \emph{less} (undercharged or on-target).
-          The next section (\S\ref{sec:sorting_algorithm}) shows exactly
-          how the algorithm decides which cell gets which mode.
+          The next section shows exactly how the algorithm decides
+          which cell gets which mode.
 \end{itemize}
 \end{statebox}
 
