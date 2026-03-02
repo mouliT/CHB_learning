@@ -11,6 +11,7 @@
 1. **One section at a time.** Write one section, stop, wait for the user's explicit green signal before writing the next. Never pre-populate multiple sections.
 2. **Commit and push automatically** after every correction or new section. Do NOT ask for push permission — it is pre-approved for this project.
 3. **Pull before editing** if the user says they pushed from Overleaf (`git pull` first).
+4. **Read the paper figure before describing it.** Do NOT describe control loops, signals, or block-diagram topology from prior knowledge alone — look at the actual figure image. Classic mistake: assuming "outer = current, inner = voltage" when this paper's Fig. 2 has outer = DC voltage control, inner = current control.
 
 ## Document Structure
 - Uses `\setcounter{section}{-1}` so Section 0 exists before Section 1.
@@ -30,20 +31,20 @@
 2. **Figure filenames:** `DLVBMCHBC_Fig*` (NOT `P3_Fig*` — that was a previous naming convention).
 3. **Grid voltage equation:** `v_g = v_1 + v_2 + ... + v_n` (NOT `i_g × sum(...)` — that is dimensionally wrong).
 4. **Torch battery analogy:** removed by user — do not re-introduce it.
+5. **Control loop hierarchy (§2.2, paper Fig. 2):** outer loop = DC-link voltage control (slow, produces I_g*); inner loop = grid current control (fast, produces v_ref); balancing algorithm is a third separate layer adjusting individual Mi. Do NOT swap inner and outer — this was written incorrectly and corrected.
 
 ## Document Progress
 | Section | Status | Notes |
 |---|---|---|
 | §0 Before You Begin | ✅ Complete | All 6 subsections, buildup figure embedded |
 | §1 The Circuit | ✅ Complete | Paper Fig.1, component walk-through, loading power with governing equations |
-| §2+ | ⏳ Not started | Awaiting green signal on §1 |
+| §2 From Loading Power to Control | ✅ Complete | P_H,i derivation (product-to-sum), Mi* formula, Fig.2 control scheme (outer=voltage, inner=current, balancing=3rd layer) |
+| §3+ | ⏳ Awaiting green signal on §2 | |
 
-## §1 Key Equations (for continuity)
+## Key Equations (for continuity across sections)
 - Capacitor energy balance: `C·Vdc,i·dVdc,i/dt = P_i,src - P_H,i`
 - Steady-state condition per cycle k: `P_H,i(k) = P_i,src(k)`
-- Non-clamped loading power (derived in §2): `P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g)`
-- "Continuously corrects" means re-solving Mi(k) every grid cycle because P_i,src(k) changes
-
-## Next Section Plan (§2)
-Cover: how P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g) is derived (integral of v_i·i_g over one period),
-and introduce the control scheme (paper Fig. 2 — typical control architecture).
+- Non-clamped loading power: `P_H,i = ½·Vdc,i·Mi·Ig·cos(φ_g)`
+- Modulation index target: `Mi* = 2·P_i,src / (Vdc,i·Ig·cos(φ_g))`
+- Coupling constraint: `Σ Vdc,i·Mi = Vref`
+- Control loop order (paper Fig. 2): outer = DC voltage → produces Ig*; inner = current control → produces Vref; balancing = per-cell Mi adjustment
