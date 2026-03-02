@@ -429,13 +429,33 @@ negative = absorbing). In steady state, $\PHi{i}$ must equal the
 DC source power $P_{i,\mathrm{src}}$ to keep $\Vdci{i}$ constant.
 \end{eqnbox}
 
-\begin{physbox}[Why ``Loading Power'' and Not Just ``Power''?]
-Every cell delivers power to the AC string. But the DC-link capacitor
-does not care about the total power flow --- it only cares about the
-\emph{imbalance} between what the DC source pushes in and what the
-AC side pushes out. Loading power is that imbalance, expressed as the
-average AC-side power per cell. When $\PHi{i} = P_{i,\mathrm{src}}$
-the capacitor voltage is constant; when they differ, the voltage drifts.
+\begin{physbox}[Why ``Loading Power'' and Not Just ``Power''? --- The Governing Equation]
+The DC-link capacitor of cell $i$ stores energy
+$E_i = \tfrac{1}{2}C\Vdci{i}^2$.
+Two power flows act on it simultaneously:
+\begin{itemize}
+    \item $P_{i,\mathrm{src}}$ flows \textbf{in} from the DC source.
+    \item $\PHi{i}$ flows \textbf{out} to the AC series string.
+\end{itemize}
+The net rate of energy change is their difference, which by
+$\tfrac{d}{dt}(\tfrac{1}{2}C V^2) = CV\dot{V}$ gives:
+\[
+    C\,\Vdci{i}\,\frac{d\Vdci{i}}{dt}
+    \;=\; P_{i,\mathrm{src}} - \PHi{i}
+\]
+Three consequences follow directly from this one equation:
+\begin{enumerate}
+    \item \textbf{Steady state} ($\dot{V}_{dc,i} = 0$) requires exactly
+          $\PHi{i} = P_{i,\mathrm{src}}$ --- the AC side must absorb
+          precisely what the DC source supplies.
+    \item \textbf{Overcharging:} if $P_{i,\mathrm{src}} > \PHi{i}$
+          the RHS is positive $\Rightarrow$ $\Vdci{i}$ rises.
+    \item \textbf{Discharging:} if $P_{i,\mathrm{src}} < \PHi{i}$
+          the RHS is negative $\Rightarrow$ $\Vdci{i}$ falls.
+\end{enumerate}
+This is why the paper focuses entirely on controlling $\PHi{i}$:
+it is the \emph{only} quantity the modulator can manipulate to
+keep $\Vdci{i}$ at its target value.
 \end{physbox}
 
 \begin{warningbox}[The Key Asymmetry]
