@@ -12,6 +12,7 @@
 2. **Commit and push automatically** after every correction or new section. Do NOT ask for push permission — it is pre-approved for this project.
 3. **Pull before editing** if the user says they pushed from Overleaf (`git pull` first).
 4. **Read the paper figure before describing it.** Do NOT describe control loops, signals, or block-diagram topology from prior knowledge alone — look at the actual figure image. Classic mistake: assuming "outer = current, inner = voltage" when this paper's Fig. 2 has outer = DC voltage control, inner = current control.
+5. **Never use `\ref` to a label that does not yet exist.** Forward references to unwritten sections or undefined figures compile as `??`. Rule: if the target section/figure is not yet in the document, use plain text (e.g. "the next section" or "paper Fig. 9") instead of a `\ref`.
 
 ## Document Structure
 - Uses `\setcounter{section}{-1}` so Section 0 exists before Section 1.
