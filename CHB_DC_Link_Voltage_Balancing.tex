@@ -885,8 +885,133 @@ between cells quickly without waiting many grid cycles.
 \label{sec:results}
 % ============================================================
 
-\textit{This section will be written after Section~\ref{sec:algorithm} is approved.
-It will place and explain the remaining paper figures in order
-(paper Figs.\,9--14) and connect them to the earlier theory.}
+\textit{This section validates the proposed method through comprehensive
+simulation studies and experimental results. The simulations demonstrate
+the method's superior balancing capability and dynamic response, while
+the experiments confirm its practical feasibility on a real CHB prototype.}
 
-\end{document}
+% ── §5.1 ─────────────────────────────────────────────────────────────────
+\subsection{Simulation Validation}
+\label{subsec:simulation}
+
+The feasibility of the proposed method is first validated through simulation
+using a six-cell CHB converter with the following specifications:
+
+\begin{statebox}[Simulation Parameters]
+\begin{tabular}{p{0.4\linewidth} p{0.5\linewidth}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Grid voltage amplitude ($V_g$) & 2\,kV \\
+Grid current amplitude ($I_g$) & 60\,A \\
+Filter inductance ($L_f$) & 1\,mH \\
+Cell DC voltage ($V_{dc,i}$) & 600\,V (nominal) \\
+Nominal modulation index ($M$) & 0.78 \\
+Switching frequency ($f_{sw}$) & 10\,kHz \\
+Balancing update frequency ($f_{bal}$) & 3.6\,kHz \\
+IGBT device & IXYB82N120C3H1 \\
+\bottomrule
+\end{tabular}
+\end{statebox}
+
+The balancing update frequency of 3.6\,kHz corresponds to 72 updates per
+grid cycle (50\,Hz), enabling very fast response compared to conventional methods.
+
+\figentry{fig:paper_fig9}{DLVBMCHBC_Fig9_page05}%
+    {Comparison of maximum loading power capability with conventional method
+     (paper Fig.\,9).
+     The proposed method achieves 27\% higher maximum loading power across
+     different nominal modulation indices, extending the operating range for
+     applications with severe power imbalances.}{0.8}
+
+\figentry{fig:paper_fig10}{DLVBMCHBC_Fig10_page06}%
+    {Control performance comparison under power imbalance conditions
+     (paper Fig.\,10).
+     (a) Conventional PI method shows slow response and ripple voltage
+     amplitude differences between cells.
+     (b) Proposed method with unity power factor achieves balanced ripple
+     amplitudes and fast settling.
+     (c) Proposed method maintains performance at 0.8 power factor.
+     Loading power ratio changes from 1:1 to 1.25:0.75 at $t=0.5$\,s.}{0.95}
+
+\figentry{fig:paper_fig11}{DLVBMCHBC_Fig11_page06}%
+    {Maximum control performance comparison (paper Fig.\,11).
+     (a) Conventional method fails when loading power ratio exceeds
+     capability limits (modulation index saturates at $\pm 1$).
+     (b) Proposed method successfully balances voltages with extreme
+     imbalance (1.62:0.38 ratio), utilizing square-wave modulation.
+     Power factor = -1, $M=0.78$.}{0.95}
+
+\begin{circuitbox}[Key Simulation Insights]
+\begin{enumerate}
+    \item \textbf{Maximum capability:} The proposed method handles 27\% higher
+          loading power imbalance than conventional PI control (Fig.\,9).
+    \item \textbf{Dynamic response:} Settling time improves from 0.3\,s to
+          milliseconds (Fig.\,10), independent of power factor (Fig.\,10c).
+    \item \textbf{Voltage ripple:} All cells maintain identical ripple amplitudes
+          due to fast balancing updates, unlike the conventional method.
+    \item \textbf{Extreme imbalance:} At 1.62:0.38 power ratio, the method
+          uses square-wave modulation (Fig.\,11b) to achieve the theoretical
+          maximum capability.
+\end{enumerate}
+\end{circuitbox}
+
+% ── §5.2 ─────────────────────────────────────────────────────────────────
+\subsection{Experimental Validation}
+\label{subsec:experiment}
+
+The proposed method is experimentally validated on a three-cell CHB prototype
+connected to the real grid (230\,V$_{\mathrm{rms}}$). The setup uses lower-voltage
+components for safety but maintains the same control principles.
+
+\begin{statebox}[Experimental Setup Parameters]
+\begin{tabular}{p{0.4\linewidth} p{0.5\linewidth}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Grid voltage & 230\,V$_{\mathrm{rms}}$ (real grid) \\
+Cell DC voltage (nominal) & 180\,V \\
+Modulation index ($M$) & 0.6 \\
+Switching frequency ($f_{sw}$) & 10\,kHz \\
+Operation mode & Rectifier ($\vg\ig < 0$) \\
+Load emulation & Resistor banks with unbalancing resistors \\
+\bottomrule
+\end{tabular}
+\end{statebox}
+
+\figentry{fig:paper_fig12}{DLVBMCHBC_Fig12_page06}%
+    {Developed three-cell CHB prototype (paper Fig.\,12).
+     The converter connects directly to the real grid with resistor banks
+     on DC links to emulate unbalanced loading powers.
+     Unbalancing resistors create the power imbalance conditions.}{0.75}
+
+\figentry{fig:paper_fig13}{DLVBMCHBC_Fig13_page07}%
+    {Steady-state control performance comparison (paper Fig.\,13).
+     Top row: conventional PI method; bottom row: proposed method.
+     (a) Balanced condition (P = 1:1:1), (b) moderate imbalance (1.2:1:0.8),
+     (c) severe imbalance (1.4:1:0.6).
+     The proposed method maintains voltage regulation even at extreme
+     imbalances where conventional method fails.}{0.95}
+
+\figentry{fig:paper_fig14}{DLVBMCHBC_Fig14_page07}%
+    {Dynamic response comparison (paper Fig.\,14).
+     Loading power ratio = 6:4:2 (3:2:1 normalized).
+     (a) Conventional PI method: 1.85\,s settling time.
+     (b) Proposed method: 140\,ms settling time (13$\times$ faster).
+     The improvement comes from the modulation-based approach, not
+     faster PI tuning.}{0.95}
+
+\begin{warningbox}[Experimental Results Summary]
+\begin{enumerate}
+    \item \textbf{Steady-state balancing:} Successfully regulates DC voltages
+          under extreme imbalances (1.4:1:0.6) where conventional method fails.
+    \item \textbf{Dynamic performance:} 13$\times$ faster settling time
+          (1.85\,s vs 140\,ms) due to modulation-based balancing.
+    \item \textbf{Real-world validation:} Results on actual grid-connected
+          hardware confirm simulation predictions and theoretical analysis.
+    \item \textbf{Scalability:} The three-cell prototype validates the method
+          for practical implementation; principles extend to higher cell counts.
+\end{enumerate}
+\end{warningbox}
+
+\clearpage
