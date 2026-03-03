@@ -1,0 +1,301 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath, amssymb}
+\usepackage{physics}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\geometry{margin=1in}
+
+\title{Tutorial on DC-Link Voltage Balancing Modulation\\
+for Cascaded H-Bridge Converters}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This document provides a structured tutorial explanation of the modulation-based DC-link voltage balancing method for Cascaded H-Bridge (CHB) converters.
+
+\section{System Description and Notation}
+
+\subsection{Converter Structure}
+
+A single-phase grid-connected CHB converter consists of:
+
+\begin{itemize}
+\item $N$ : Number of cascaded H-bridge cells
+\item $V_{dc,xH}$ : DC-link voltage of cell $x$, $x = 1,2,\dots,N$
+\item $v_{xH}(t)$ : AC output voltage of cell $x$
+\item $v_g(t)$ : Grid voltage
+\item $V_g$ : RMS grid voltage
+\item $\omega = 2\pi f$ : Grid angular frequency
+\item $i_g(t)$ : Grid current
+\item $I_g$ : RMS grid current amplitude
+\item $L$ : Grid-side filter inductance
+\end{itemize}
+
+Total converter output voltage:
+
+\begin{equation}
+v_{ac}(t) = \sum_{x=1}^{N} v_{xH}(t)
+\end{equation}
+
+\subsection{Cell Power}
+
+Instantaneous power of cell $x$:
+
+\begin{equation}
+p_x(t) = v_{xH}(t)\, i_g(t)
+\end{equation}
+
+Average power over one grid period $T$:
+
+\begin{equation}
+P_x = \frac{1}{T} \int_0^T v_{xH}(t) i_g(t)\, dt
+\end{equation}
+
+If:
+
+\[
+P_1 \neq P_2 \neq \dots \neq P_N
+\]
+
+then DC voltages evolve as:
+
+\begin{equation}
+C_x \frac{dV_{dc,xH}}{dt}
+=
+\frac{P_{in,x} - P_x}{V_{dc,xH}}
+\end{equation}
+
+\section{Conventional PI-Based Voltage Balancing}
+
+\subsection{Control Structure}
+
+Three control loops:
+
+\begin{enumerate}
+\item Total DC voltage control
+\item Grid current control
+\item Individual DC-link balancing loops
+\end{enumerate}
+
+For each cell:
+
+\begin{equation}
+e_x = V_{dc,H}^* - V_{dc,xH}
+\end{equation}
+
+Balancing PI output:
+
+\begin{equation}
+\Delta v_x
+\end{equation}
+
+Final reference:
+
+\begin{equation}
+v_{xH}^* = v^* + \Delta v_x
+\end{equation}
+
+\subsection{Modulation Index}
+
+\begin{equation}
+M_x = \frac{V_{xH,1}}{V_{dc,xH}}
+\end{equation}
+
+Linear region:
+
+\[
+-1 \le M_x \le 1
+\]
+
+\subsection{Maximum Power Capability}
+
+\begin{equation}
+P_{max,conv} =
+P_{nom}
+\frac{V_{dc,nH}}{V_g}
+\sqrt{
+1 -
+\left(
+\frac{\omega L I_g}{N V_{dc,nH}}
+\right)
+}
+\end{equation}
+
+where:
+
+\begin{itemize}
+\item $P_{nom}$ : Nominal converter power
+\item $V_{dc,nH}$ : DC-link voltage of one cell
+\item $V_g$ : Grid voltage amplitude
+\item $\omega$ : Grid angular frequency
+\item $L$ : Filter inductance
+\item $I_g$ : Grid current amplitude
+\item $N$ : Number of cells
+\end{itemize}
+
+\subsection{Bandwidth Constraint}
+
+\[
+t_s < t_c < t_v < t_{bal}
+\]
+
+where:
+
+\begin{itemize}
+\item $t_s$ : Switching period
+\item $t_c$ : Current loop period
+\item $t_v$ : Voltage loop period
+\item $t_{bal}$ : Balancing loop period
+\end{itemize}
+
+\section{Proposed Modulation-Based Method}
+
+\subsection{Operating Modes}
+
+Let:
+
+\begin{itemize}
+\item $v^*(t)$ : Reference sinusoidal modulation signal
+\item $v_c^*(t)$ : Clamped modulation signal
+\item $v_{nc}^*(t)$ : Non-clamped modulation signal
+\end{itemize}
+
+Clamped mode:
+
+\begin{equation}
+v_c^* =
+\begin{cases}
+1 & v_g > 0 \\
+-1 & v_g < 0
+\end{cases}
+\end{equation}
+
+Non-clamped mode:
+
+\begin{equation}
+v_{nc}^* = N v^* - v_c^*
+\end{equation}
+
+Constraint:
+
+\begin{equation}
+v_c^* + v_{nc}^* = N v^*
+\end{equation}
+
+\section{Sorting Algorithm}
+
+At each balancing period:
+
+\begin{enumerate}
+\item Measure $V_{dc,xH}$
+\item Sort voltages
+\item Compare to reference $V_{dc,H}^*$
+\item Assign clamped or non-clamped mode
+\end{enumerate}
+
+If:
+
+\[
+v_g i_g < 0
+\]
+
+\begin{itemize}
+\item $V_{dc,xH} < V_{dc,H}^*$ → clamped
+\item $V_{dc,xH} > V_{dc,H}^*$ → non-clamped
+\end{itemize}
+
+If:
+
+\[
+v_g i_g > 0
+\]
+
+Logic reverses.
+
+\section{Fourier Analysis}
+
+Fourier coefficients:
+
+\begin{equation}
+a_1 =
+\frac{1}{\pi}
+\int f(\theta)\cos\theta\, d\theta
+\end{equation}
+
+\begin{equation}
+b_1 =
+\frac{1}{\pi}
+\int f(\theta)\sin\theta\, d\theta
+\end{equation}
+
+Fundamental magnitude:
+
+\begin{equation}
+F = \sqrt{a_1^2 + b_1^2}
+\end{equation}
+
+\subsection{Clamped Waveform}
+
+\begin{equation}
+f_c(\theta) =
+\begin{cases}
+1 & [0,\phi] \\
+M\cos\theta & [\phi,\pi] \\
+-1 & [\pi,\pi+\phi]
+\end{cases}
+\end{equation}
+
+where:
+
+\begin{itemize}
+\item $\phi$ : Clamping angle
+\item $M$ : Nominal modulation index
+\end{itemize}
+
+\subsection{Fundamental Component}
+
+\begin{equation}
+F_c(\phi) =
+\frac{1}{\pi}
+\sqrt{
+\left(0.5M\sin(2\phi) - M\phi - 2\cos\phi + \pi M + 2\right)^2
++
+\left(\sin\phi(2 - M\sin\phi)\right)^2
+}
+\end{equation}
+
+Non-clamped fundamental:
+
+\begin{equation}
+F_{nc}(\phi) = 2M - F_c(\phi)
+\end{equation}
+
+\section{Performance Improvements}
+
+\begin{itemize}
+\item Imbalance capability increased by approximately 27\%
+\item Dynamic response approximately 13 times faster
+\item Ripple amplitude balanced across cells
+\end{itemize}
+
+\section{Conclusion}
+
+The proposed modulation-based voltage balancing method:
+
+\begin{itemize}
+\item Avoids modulation saturation
+\item Decouples balancing from outer-loop bandwidth
+\item Uses waveform shaping instead of amplitude modification
+\item Improves both dynamic performance and power imbalance capability
+\end{itemize}
+
+\end{document}
