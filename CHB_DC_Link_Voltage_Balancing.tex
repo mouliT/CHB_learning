@@ -615,6 +615,14 @@ M\sin\theta & \theta\in[\phic,\pi] \text{ and } \theta\in[\pi+\phic,2\pi]\\
 \]
 \end{eqnbox}
 
+\begin{physbox}[Sine vs. cosine in paper Eq.\,6]
+In the IEEE paper, the middle segment is written as $M\cos\theta$.
+Using $M\sin\theta$ instead is just a phase shift in the definition of $\theta$.
+The Fourier coefficients $a_1$ and $b_1$ change, but the fundamental magnitude
+$F_c(\phic)=\sqrt{a_1^2+b_1^2}$ (and therefore the loading-power capability)
+is unchanged.
+\end{physbox}
+
 we can compute the fundamental explicitly.
 
 \begin{circuitbox}[Step-by-step: deriving paper Eq.\,7]
@@ -713,14 +721,162 @@ cells quickly.
 \label{sec:algorithm}
 % ============================================================
 
-\textit{This section will be written after Section~\ref{sec:proposed} is approved.
-It will follow the paper's implementation sequence and will place/explain the
-next paper figures in order (paper Figs.\,5--8).}
+\textit{This section turns paper Section III-B into a step-by-step recipe.
+We will answer two questions:
+(1) how the controller decides which cells get clamped vs non-clamped signals,
+and (2) how that decision scales from 2 cells to $n$ cells.
+The key paper figures here are Fig.\,5--Fig.\,8.}
 
-\begin{warningbox}[Draft Removed]
-The previous draft of Sections~4--5 has been intentionally removed so we can
-rebuild them section-by-section with explicit approval.
-\end{warningbox}
+% ── §4.1 ─────────────────────────────────────────────────────────────────
+\subsection{Sorting Inputs, Pairing Rule, and the Sign of $\vg\ig$}
+\label{subsec:sorting}
+
+Every balancing update (every $t_{bal}$), the controller measures all cell voltages
+$\Vdci{i}$ and compares them to the per-cell reference $V_{dc,H}^{*}$.
+Then it sorts the cells from highest voltage to lowest voltage.
+
+The paper uses the sign of instantaneous grid power $\vg\ig$ to decide whether
+clamping should \emph{charge} a low-voltage cell or \emph{discharge} a high-voltage
+cell.
+
+\begin{statebox}[Sign Rule (paper Section III-A/B)]
+\textbf{Rectifier mode} ($\vg\ig < 0$): grid power flows \emph{into} the CHB and can
+charge the capacitors.
+\begin{itemize}
+    \item If a cell is \textbf{undercharged} ($\Vdci{i} < V_{dc,H}^{*}$), assign it
+          \textbf{clamped} mode ($v_c^{*}$) so it charges faster.
+    \item If a cell is \textbf{overcharged} ($\Vdci{i} > V_{dc,H}^{*}$), assign it
+          \textbf{non-clamped} mode ($v_{nc}^{*}$) so it charges slower (or
+          effectively discharges relative to the others).
+\end{itemize}
+
+\textbf{Inverter mode} ($\vg\ig > 0$): power flows \emph{from} the CHB to the grid.
+The assignments swap: overcharged cells are clamped to discharge faster, and
+undercharged cells are non-clamped to discharge slower.
+\end{statebox}
+
+\textbf{The pairing rule.}
+The clamped and non-clamped signals are defined to be complementary
+(Section~\ref{sec:proposed}, paper Eq.\,3).
+To keep the total reference sinusoidal, the paper assigns cells in \emph{pairs}:
+each clamped cell is paired with a non-clamped cell.
+Any remaining unpaired cell(s) use the original sinusoidal reference $v^{*}$.
+
+% ── §4.2 ─────────────────────────────────────────────────────────────────
+\subsection{Two-Cell Case Study (paper Fig.\,5)}
+\label{subsec:two_cell}
+
+Paper Fig.\,5 illustrates the idea with $n=2$ cells and an intentionally slow
+update period $t_{bal}=5$\,ms (so the regions are easy to see).
+The figure assumes $\vg\ig<0$ (rectifier mode).
+
+\figentry{fig:paper_fig5}{DLVBMCHBC_Fig5_page03}%
+    {Two-cell case study with $t_{bal}=5$\,ms (paper Fig.\,5).
+     The controller updates the mode assignment every $t_{bal}$, so one grid
+     cycle is split into four regions (I--IV).
+     For $\vg\ig<0$, the lower-voltage cell is clamped to charge faster, and the
+     higher-voltage cell is non-clamped to charge slower.}{0.9}
+
+The four regions correspond to four possible orderings around the reference
+$V_{dc,H}^{*}$:
+
+\begin{circuitbox}[Region-by-Region Logic for $n=2$ (rectifier mode)]
+\begin{enumerate}
+    \item \textbf{Region I:} $\Vdci{2} > V_{dc,H}^{*} > \Vdci{1}$.
+          Cell~1 is undercharged $\Rightarrow$ clamped; cell~2 is overcharged
+          $\Rightarrow$ non-clamped.
+
+    \item \textbf{Region II:} $\Vdci{1} > V_{dc,H}^{*} > \Vdci{2}$.
+          The ordering flips, so the assignment flips: cell~2 clamped, cell~1
+          non-clamped.
+
+    \item \textbf{Region III:} $\Vdci{1} > \Vdci{2} > V_{dc,H}^{*}$.
+          Both cells are above the reference.
+          The paper's rule is to clamp the \emph{lower} of the two voltages and
+          non-clamp the higher one, so the voltages move toward each other.
+
+    \item \textbf{Region IV:} $V_{dc,H}^{*} > \Vdci{2} > \Vdci{1}$.
+          Both cells are below the reference.
+          Clamp the lowest-voltage cell (cell~1) and non-clamp the higher one
+          (cell~2).
+\end{enumerate}
+\end{circuitbox}
+
+Even in this simple case you can see the algorithm's character:
+it does not apply a tiny correction like a PI loop.
+It \emph{switches between two waveform shapes} to quickly change the loading power
+each cell processes.
+
+% ── §4.3 ─────────────────────────────────────────────────────────────────
+\subsection{Four-Cell Case: The Five Sorting Cases (paper Fig.\,6)}
+\label{subsec:four_cell}
+
+For more than two cells, the main new question is:
+\emph{which cells should be paired?}
+Paper Fig.\,6 lists the five distinct cases that can occur for $n=4$.
+The same logic extends to any $n$.
+
+\figentry{fig:paper_fig6}{DLVBMCHBC_Fig6_page04}%
+    {Five cases for four cells (paper Fig.\,6).
+     Without bracket: $\vg\ig<0$ (rectifier mode).
+     With bracket: $\vg\ig>0$ (inverter mode).
+     Cells are sorted by voltage; the controller forms clamped/non-clamped pairs
+     so the total modulation remains sinusoidal.}{0.95}
+
+\begin{statebox}[How to read paper Fig.\,6]
+\textbf{Step 1: sort} the cell voltages.
+\textbf{Step 2: locate} where $V_{dc,H}^{*}$ lies relative to the sorted list.
+\textbf{Step 3: pair} high-voltage cells with low-voltage cells.
+In rectifier mode ($\vg\ig<0$), the low-voltage cell in each pair is clamped and
+the high-voltage cell is non-clamped; in inverter mode the assignment reverses.
+Any leftover unpaired cell(s) remain sinusoidal.
+\end{statebox}
+
+The key point is that Fig.\,6 is not describing ``five numbers of clamped cells''.
+It is describing five different \emph{sorting outcomes} (where the reference sits
+among the sorted voltages) and the resulting pairing pattern.
+
+% ── §4.4 ─────────────────────────────────────────────────────────────────
+\subsection{Clamping Angle $\phic$ (paper Fig.\,7)}
+\label{subsec:clamp_angle}
+
+Once a cell is assigned clamped mode, the next knob is \emph{how much} of the cycle
+it stays clamped.
+The paper parameterises this with the clamping angle $\phic \in [0,\pi]$.
+
+\figentry{fig:paper_fig7}{DLVBMCHBC_Fig7_page04}%
+    {Clamped modulation signal with varied clamping angle $\phic$ (paper Fig.\,7).
+     Larger $\phic$ widens the flat region, increasing the fundamental magnitude
+     of the clamped waveform and therefore increasing the cell's achievable
+     loading power.}{0.85}
+
+At $\phic=0$ there is no clamping.
+At $\phic=\pi$ the waveform is maximally clamped.
+Section~\ref{sec:proposed} derived how the fundamental magnitude $F_c(\phic)$
+varies with $\phic$.
+
+% ── §4.5 ─────────────────────────────────────────────────────────────────
+\subsection{What the Capability Surface Means (paper Fig.\,8)}
+\label{subsec:surface}
+
+Paper Fig.\,8 plots the resulting loading power capability versus nominal
+modulation index $M$ and clamping angle $\phic$.
+
+\figentry{fig:paper_fig8}{DLVBMCHBC_Fig8_page04}%
+    {Loading power as a function of nominal modulation index $M$ and clamping
+     angle $\phic$ (paper Fig.\,8).
+     (a) clamped mode: achievable loading power increases with $\phic$.
+     (b) non-clamped mode: achievable loading power decreases accordingly.
+     This spread is the range the sorting algorithm exploits to balance cell
+     voltages quickly.}{0.95}
+
+\begin{physbox}[Why this figure matters]
+In PI balancing, you can only move loading power by changing the sinusoidal
+amplitude, and you hit the hard limit $|M|\le 1$.
+In the proposed method, clamping changes the waveform's fundamental magnitude.
+That creates a much wider range of possible loading powers, so energy can be moved
+between cells quickly without waiting many grid cycles.
+\end{physbox}
 
 \clearpage
 
